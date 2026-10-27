@@ -1,0 +1,2220 @@
+# DUESGUARD AI — MASTER PROJECT DEVELOPMENT PROMPT
+## Principal Full-Stack Edge AI Engineer | Production-Oriented SaaS Platform
+
+---
+
+# 1. ROLE AND OBJECTIVE
+
+Act as a **Principal Full-Stack Edge AI Engineer, AI Systems Architect, Senior Backend Engineer, Cloud Infrastructure Engineer and Technical Lead**.
+
+Your objective is to architect, implement, test and deploy **DuesGuard AI**, a modern AI-powered financial intelligence and evidence-preparation platform for Indian Micro, Small and Medium Enterprises (MSMEs).
+
+DuesGuard AI helps MSMEs organize delayed-payment information, extract invoice and transaction information from documents, reconcile financial evidence, estimate outstanding dues and MSMED statutory interest, identify missing supporting documents, and prepare reviewable case-readiness reports.
+
+Build this as a secure, scalable, maintainable, high-performance monorepo application.
+
+This is an actual software engineering project, not a UI prototype or a collection of disconnected code snippets.
+
+You must implement functional features, database persistence, authentication, integrations, automated tests, deployment configurations and operational safeguards.
+
+**Important:** Production readiness must be demonstrated through testing, security verification, deployment validation and operational readiness. A successful local build alone does not establish production readiness.
+
+## Product identity
+
+**Product:** DuesGuard AI
+
+**Tagline:** From Delayed Payments to Evidence-Ready Resolution.
+
+**Target users:**
+- Micro and Small Enterprise owners.
+- MSME finance and accounts teams.
+- MSME business administrators.
+- Authorized accountants and case reviewers.
+- Business consultants assisting MSMEs with payment documentation.
+
+## Core product workflow
+
+1. The user creates a business account and a case.
+2. The user uploads invoices, purchase orders, delivery challans, proof of delivery, payment receipts, buyer correspondence and relevant MSME registration documents.
+3. The system securely stores and validates documents.
+4. Gemini extracts structured information from digital and scanned PDFs.
+5. Deterministic validation reconciles the extracted information.
+6. The evidence engine identifies missing, contradictory and unverified records.
+7. The finance engine calculates outstanding principal and conditional MSMED statutory-interest estimates.
+8. LangGraph coordinates the analysis and records its execution history.
+9. The workflow pauses for human review.
+10. The authorized reviewer approves or corrects the findings.
+11. The system generates a versioned case summary and evidence index in PDF format.
+
+## Strict product boundaries
+
+DuesGuard AI must NOT:
+- Automatically collect outstanding payments.
+- Send threatening or automated debt-collection messages.
+- Provide legal advice.
+- Make final legal eligibility determinations.
+- Guarantee recovery of outstanding payments.
+- Automatically submit claims to government portals.
+- Present AI-generated information as verified facts without supporting evidence.
+
+The product organizes evidence and prepares financial estimates and draft case documentation for human review.
+
+---
+
+# 2. MANDATORY TECHNOLOGY STACK
+
+Use the following technologies unless Phase 0 identifies a material compatibility problem. Any proposed replacement requires an explanation and approval.
+
+## Monorepo and package management
+
+- Turborepo
+- pnpm workspaces
+- TypeScript strict mode
+- Node.js LTS for compatible development and build tooling
+- Biome for formatting and linting
+
+## Web application
+
+- Next.js App Router
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Framer Motion
+- TanStack Query
+- tRPC client integration
+
+## Mobile application
+
+- Expo
+- React Native
+- React Native Reanimated
+- TypeScript
+- Expo-compatible navigation
+- Shared tRPC API contracts
+- Shared Zustand state
+- Expo SecureStore or another approved secure platform storage adapter
+
+## Backend and API
+
+- TypeScript
+- tRPC
+- TanStack Query
+- Zod
+- Cloudflare Workers
+- Better Auth
+
+## Database and ORM
+
+- Cloudflare D1
+- Drizzle ORM
+- Drizzle Kit
+- SQL migrations
+- SQLite-compatible database design
+
+## AI and agent orchestration
+
+- LangGraph.js
+- `@google/genai`
+- Gemini multimodal document understanding
+- Zod structured extraction schemas
+- Configurable model routing
+- Durable workflow persistence
+
+## Finance and date processing
+
+- `decimal.js`
+- `date-fns`
+- Dedicated `packages/finance`
+
+## File storage and caching
+
+- Cloudflare R2 for private document and report storage.
+- Cloudflare KV for non-authoritative caching.
+- D1 or Durable Objects for authoritative workflow and application state.
+
+## Background processing
+
+- Cloudflare Workflows for durable, long-running analysis.
+- Cloudflare Queues for decoupled events and background consumers.
+- Dead-letter queue for repeated processing failures.
+
+Do not introduce QStash alongside these services in the initial architecture unless a documented requirement justifies it.
+
+## Notifications and subscription billing
+
+- Resend for optional email notifications.
+- Razorpay or Cashfree for optional DuesGuard SaaS subscriptions.
+- Cloudflare Turnstile for bot protection.
+
+Payment integrations must never be used to collect the MSME user's outstanding customer invoices.
+
+## Security and deployment
+
+- Cloudflare Secrets or the selected hosting provider's secret manager.
+- GitHub Actions.
+- Vercel for the default Next.js web deployment.
+- Cloudflare Workers for API and background infrastructure.
+- Expo EAS for mobile build and distribution.
+
+---
+
+# 3. ARCHITECTURE AND DEPLOYMENT DECISIONS
+
+## 3.1 Default deployment architecture
+
+Use a clearly separated application and data architecture.
+
+### Web
+Deploy `apps/web` on Vercel using Next.js App Router.
+
+### API
+Deploy `apps/api-worker` on Cloudflare Workers.
+
+The API Worker hosts:
+- tRPC procedures.
+- Better Auth.
+- Tenant authorization.
+- Application service layer.
+- Database access.
+- R2 upload authorization.
+- Workflow initiation.
+
+### Database
+Use Cloudflare D1 with Drizzle ORM.
+
+### Document storage
+Use private Cloudflare R2 buckets.
+
+### Background jobs
+Use Cloudflare Workflows and Queues.
+
+### Agent orchestration
+Use LangGraph.js within a compatible server-side worker execution environment.
+
+### Mobile
+Use Expo with EAS Build and EAS Submit.
+
+### Domains
+
+Support a domain arrangement such as:
+
+- `app.example.com` — Web application.
+- `api.example.com` — API and authentication.
+- Mobile clients connect to the API through the same authenticated API contracts.
+
+Configure Better Auth trusted origins, secure cookies, CORS, CSRF protection and cross-platform authentication deliberately.
+
+Do not assume web cookie authentication automatically works in React Native.
+
+Implement platform-appropriate authentication and secure session handling.
+
+## 3.2 All-Cloudflare alternative
+
+If an all-Cloudflare deployment is selected:
+
+- Deploy the Next.js application to Cloudflare Workers, not as a full dynamic Next.js application on Pages.
+- Evaluate the currently recommended Next.js Workers deployment adapter.
+- Compare vinext and other documented compatible deployment paths.
+- Verify App Router, server components, route handlers, authentication and required runtime APIs.
+- Build a small compatibility proof before adopting it for the entire application.
+- Record known limitations and fallback strategies.
+
+Do not choose a beta adapter merely because it is available. Compare its compatibility and maintenance status against the project requirements.
+
+## 3.3 Runtime compatibility gate
+
+Before installing the complete application stack, verify:
+- Next.js compatibility.
+- Cloudflare Workers compatibility.
+- tRPC compatibility.
+- Better Auth compatibility with D1.
+- Drizzle compatibility.
+- Gemini SDK compatibility.
+- LangGraph.js compatibility.
+- Background workflow execution.
+- PDF generation compatibility.
+- Expo monorepo compatibility.
+
+For Node.js-dependent functionality, use a separate supported Node.js execution environment when necessary.
+
+Never weaken security or remove features merely to force an incompatible library into an Edge runtime.
+
+---
+
+# 4. STRICT TURBOREPO ARCHITECTURE AND MODULE BOUNDARIES
+
+Use the following initial repository organization:
+
+```text
+duesguard-ai/
+│
+├── apps/
+│   ├── web/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── public/
+│   │
+│   ├── mobile/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── assets/
+│   │
+│   ├── api-worker/
+│   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   ├── context.ts
+│   │   │   ├── routers/
+│   │   │   └── middleware/
+│   │   └── wrangler.jsonc
+│   │
+│   └── jobs-worker/
+│       ├── src/
+│       └── wrangler.jsonc
+│
+├── packages/
+│   ├── api/
+│   │   ├── routers/
+│   │   ├── procedures/
+│   │   └── index.ts
+│   │
+│   ├── api-client/
+│   │   ├── create-client.ts
+│   │   ├── links/
+│   │   └── query-client.ts
+│   │
+│   ├── schema/
+│   │   ├── auth/
+│   │   ├── cases/
+│   │   ├── documents/
+│   │   ├── invoices/
+│   │   ├── finance/
+│   │   └── index.ts
+│   │
+│   ├── store/
+│   │   ├── slices/
+│   │   ├── adapters/
+│   │   └── index.ts
+│   │
+│   ├── db/
+│   │   ├── schema/
+│   │   ├── migrations/
+│   │   ├── repositories/
+│   │   └── index.ts
+│   │
+│   ├── finance/
+│   │   ├── dates/
+│   │   ├── calculations/
+│   │   ├── msmed/
+│   │   ├── rates/
+│   │   └── tests/
+│   │
+│   ├── ai/
+│   │   ├── agents/
+│   │   ├── graph/
+│   │   ├── prompts/
+│   │   ├── extraction/
+│   │   ├── model-routing/
+│   │   └── checkpoint/
+│   │
+│   ├── storage/
+│   │   ├── r2/
+│   │   └── documents/
+│   │
+│   ├── reports/
+│   │   ├── templates/
+│   │   ├── generators/
+│   │   └── exports/
+│   │
+│   ├── config/
+│   └── types/
+│
+├── tooling/
+│   ├── biome/
+│   ├── typescript/
+│   └── scripts/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   ├── security/
+│   ├── deployment/
+│   └── runbooks/
+│
+├── .github/
+│   └── workflows/
+│
+├── pnpm-workspace.yaml
+├── turbo.json
+├── package.json
+├── biome.json
+├── tsconfig.base.json
+├── .env.example
+└── README.md
+```
+
+Adjust the structure only when necessary. Explain major changes.
+
+## 4.1 Shared package rules
+
+The following must have a single source of truth:
+
+- Zod schemas.
+- tRPC request and response contracts.
+- API router types.
+- Domain types.
+- Finance-related types.
+- Zustand business-state slices.
+- Shared domain validation.
+- Constants and status definitions.
+
+Both `apps/web` and `apps/mobile` must import these shared packages.
+
+Never duplicate:
+- API endpoint definitions.
+- Request payload definitions.
+- Response types.
+- Finance calculations.
+- Domain validation rules.
+- Business logic.
+
+## 4.2 Shared API client
+
+Create `packages/api-client` with a reusable typed client factory.
+
+Both applications consume the same `AppRouter` type.
+
+Each platform injects its own:
+- API base URL.
+- Authentication mechanism.
+- Session handling.
+- Request headers.
+- Network configuration.
+
+Do not use a single browser-specific client implementation inside the mobile application.
+
+Do not place `window`, `localStorage`, Expo-only APIs or platform-specific storage APIs in platform-independent business modules.
+
+## 4.3 Server/client boundaries
+
+- Keep database access server-only.
+- Keep Gemini credentials server-only.
+- Keep R2 credentials server-only.
+- Keep API authorization logic server-side.
+- Prevent database packages and service secrets from entering frontend bundles.
+- Use explicit package exports.
+- Prohibit deep imports into package internals.
+- Prohibit circular dependencies.
+- Add package-boundary checks to CI.
+
+The frontend must never access D1 or R2 directly using privileged credentials.
+
+---
+
+# 5. CORE DOMAIN RULES AND MSMED COMPLIANCE
+
+## 5.1 Trust rule
+
+Gemini is strictly responsible for:
+- Multimodal document interpretation.
+- Extracting unstructured content.
+- Identifying document types.
+- Extracting structured fields.
+- Explaining evidence discrepancies.
+- Drafting narrative summaries from verified data.
+
+Gemini must NEVER:
+- Calculate currency totals.
+- Calculate invoice balances.
+- Calculate statutory interest.
+- Determine statutory payment deadlines.
+- Invent invoice numbers, dates or amounts.
+- Invent missing proof of delivery.
+- Override verified source data.
+- Make final legal eligibility decisions.
+
+All authoritative financial and date computations must happen in deterministic TypeScript code.
+
+## 5.2 MSMED Act Sections 15 and 16
+
+Implement a versioned MSMED compliance calculation module.
+
+The system must distinguish:
+
+### Written payment agreement
+
+Where there is an agreement in writing, the agreed payment date applies subject to the statutory maximum of 45 days from the relevant acceptance or deemed-acceptance date.
+
+### No written payment agreement
+
+Apply the appointed-day rule under the Act, based on the 15-day period from acceptance or deemed acceptance.
+
+The appointed day is the day immediately following expiry of that statutory period.
+
+### Acceptance and deemed acceptance
+
+Capture:
+- Actual delivery date or service completion date.
+- Buyer written objection date.
+- Objection communication evidence.
+- Objection resolution date.
+- Acceptance or deemed-acceptance date.
+
+A written objection made within the statutory 15-day period can affect the acceptance date.
+
+Do not treat any generic buyer complaint as an automatically valid statutory objection. Preserve the source communication and require review where necessary.
+
+### MSMED Section 16 interest
+
+The statutory framework provides for compound interest with monthly rests at three times the RBI-notified Bank Rate, subject to the applicable statutory trigger and relevant facts.
+
+Implement the calculation transparently.
+
+The finance engine must:
+- Maintain effective-dated Bank Rate records.
+- Preserve the official source and verification timestamp.
+- Identify the applicable interest start date.
+- Separate principal, payment allocations and interest.
+- Account for partial payments.
+- Support multiple invoices and multiple payments.
+- Explain the rate and compounding convention used.
+- Generate a calculation audit trail.
+
+Do not assume that one current RBI rate applies to every historical period.
+
+Do not silently substitute simple interest for compound interest.
+
+Do not invent day-count, monthly-rest, rounding or rate-transition conventions. Implement a documented policy that has been reviewed against the relevant legal framework and independently verified examples.
+
+When material legal interpretation remains uncertain, return a conditional estimate with clearly identified assumptions and a human-review warning.
+
+## 5.3 Mandatory MSME supplier identity fields
+
+Capture the seller's:
+
+- Udyam Registration Number.
+- Udyam registration date.
+- Udyam certificate document ID.
+- Enterprise classification.
+- Registered activity.
+- Applicable NIC codes.
+- Verification status.
+- Verification source.
+- Verification timestamp.
+
+Capture the buyer's:
+- Legal name.
+- Trade name, when available.
+- GSTIN, when supplied.
+- GSTIN verification status.
+
+Capture the seller's:
+- GSTIN, where applicable.
+- GSTIN verification status.
+- Registration details when available.
+
+## 5.4 GSTIN verification
+
+Implement GSTIN validation for both buyer and seller.
+
+Requirements:
+1. Validate format and checksum locally.
+2. Treat syntax validation and official registration verification as different checks.
+3. Use an official or authorized verification mechanism when available.
+4. Record verification source and timestamp.
+5. Do not mark GSTIN as verified solely because its format is correct.
+6. GSTIN may be nullable where it is not legally applicable or supplied.
+7. Flag missing or conflicting GSTIN information for review where relevant to the transaction.
+
+Never scrape government portals or rely on undocumented APIs.
+
+## 5.5 Udyam registration and transaction-date verification
+
+Implement a dedicated Udyam verification and potential eligibility-screening module.
+
+Capture transaction dates separately:
+- Contract date.
+- Purchase-order date.
+- Supply or service date.
+- Delivery date.
+- Acceptance date.
+- Invoice date.
+- Udyam registration date.
+
+The system must compare these dates and flag potential timing issues when the relevant transaction or contractual relationship predates the Udyam registration date.
+
+Do not use invoice date as the only legal eligibility test.
+
+Incorporate relevant legal guidance and judgments, including the principles concerning pre-registration supplies and retrospective MSMED benefits.
+
+Evaluate the enterprise classification and applicable registered activity. The delayed-payment framework concerns qualifying Micro and Small suppliers, not all entities carrying an MSME label.
+
+Trading NIC classifications and other potentially excluded activities must be evaluated against the current official eligibility policy. Treat uncertain cases as requiring human review.
+
+Never automatically declare statutory eligibility or ineligibility.
+
+Return statuses such as:
+
+- `registration_verified`
+- `registration_unverified`
+- `registration_missing`
+- `registration_date_conflict`
+- `classification_needs_review`
+- `activity_needs_review`
+- `potentially_ineligible`
+- `human_review_required`
+
+Store:
+- Legal policy version.
+- Verification evidence.
+- Relevant transaction dates.
+- Explanation for each warning.
+- Reviewer decision.
+
+The finance engine may provide a conditional statutory-interest estimate while eligibility remains under review. Such an estimate must never be presented as a final legal entitlement.
+
+---
+
+# 6. DATABASE DESIGN — DRIZZLE ORM
+
+Implement database schemas in `packages/db`.
+
+Use Drizzle ORM with version-controlled migrations.
+
+## 6.1 Authentication and tenancy
+
+Implement:
+- Better Auth standard authentication tables.
+- `tenants`
+- `tenant_members`
+- Role definitions and role assignments.
+
+A user may belong to multiple business tenants if the product supports it.
+
+Every business-owned record must be isolated by tenant.
+
+Do not trust `tenant_id` submitted by a browser or mobile client. Determine it from the authenticated session and verified membership.
+
+## 6.2 Core application models
+
+### Cases
+
+Fields:
+- `id`
+- `tenant_id`
+- `business_name`
+- `case_reference`
+- `status`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+### Documents
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `filename`
+- `document_type`
+- `mime_type`
+- `file_size`
+- `checksum`
+- `r2_storage_key`
+- `upload_status`
+- `security_status`
+- `extraction_status`
+- `created_at`
+
+### Invoices
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `document_id`
+- `invoice_number`
+- `buyer`
+- `seller`
+- `buyer_gstin`
+- `seller_gstin`
+- `invoice_date`
+- `due_date`
+- `total_amount_paise`
+- `currency`
+- `po_reference`
+
+### Invoice line items
+
+Fields:
+- `id`
+- `invoice_id`
+- `description`
+- `quantity`
+- `unit_price`
+- `tax_rate`
+- `tax_amount`
+- `line_total`
+- `source_page`
+
+### Purchase orders
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `document_id`
+- `po_number`
+- `buyer`
+- `seller`
+- `po_date`
+- `po_total`
+- `currency`
+
+### Delivery records
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `document_id`
+- `delivery_reference`
+- `challan_number`
+- `lr_number`
+- `pod_reference`
+- `delivery_date`
+- `acceptance_date`
+- `objection_date`
+- `objection_resolution_date`
+
+### Payments
+
+Fields:
+- `id`
+- `tenant_id`
+- `invoice_id`
+- `payment_date`
+- `amount_paise`
+- `reference`
+- `payment_document_id`
+
+### Payment allocations
+
+Support partial payments and allocation across invoices.
+
+Fields:
+- `id`
+- `payment_id`
+- `invoice_id`
+- `allocated_amount_paise`
+- `created_at`
+
+### Evidence links
+
+Create explicit relationships between:
+- Purchase orders.
+- Invoices.
+- Delivery records.
+- Payment records.
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `source_entity_type`
+- `source_entity_id`
+- `target_entity_type`
+- `target_entity_id`
+- `relationship_type`
+- `verification_status`
+- `review_notes`
+
+### Findings
+
+Fields:
+- `id`
+- `tenant_id`
+- `case_id`
+- `agent_name`
+- `severity`
+- `code`
+- `message`
+- `status`
+- `reviewer_notes`
+- `created_at`
+- `updated_at`
+
+Use `finding_documents` as a junction table to associate findings with one or more documents and specific pages.
+
+### Document extractions
+
+Store:
+- Extracted structured fields.
+- Raw extraction output.
+- Schema version.
+- Model version.
+- Prompt version.
+- Source page references.
+- Extraction status.
+- Review status.
+- Verification status.
+
+### Agent runs and events
+
+Store:
+- Analysis run ID.
+- Case ID.
+- Tenant ID.
+- Thread ID.
+- Workflow status.
+- Agent events.
+- Model metadata.
+- Error records.
+- Start and completion timestamps.
+
+### RBI Bank Rate history
+
+Store:
+- Effective date.
+- Bank Rate percentage.
+- Source URL or reference.
+- Verification timestamp.
+- Data version.
+- Verified-by information.
+
+### Audit logs
+
+Append-only record of:
+- Authentication-sensitive actions.
+- Document changes.
+- Extraction corrections.
+- Finance calculation versions.
+- Reviewer decisions.
+- Approvals and rejections.
+- Report generations.
+- Tenant administration events.
+
+### Policy versions
+
+Maintain versioned records of:
+- MSMED eligibility rules.
+- Date-calculation rules.
+- Interest methodology.
+- Model-routing configuration.
+- Extraction schema versions.
+
+## 6.3 Financial storage
+
+Store INR currency in integer paise using a database representation capable of preserving large integers.
+
+Use `decimal.js` for calculations and explicit rounding.
+
+Never use JavaScript floating-point arithmetic for authoritative currency calculations.
+
+Store date-only values separately from timestamps. Use a consistent India-business-date convention for legal transaction dates and preserve timestamps in UTC.
+
+---
+
+# 7. SECURE DOCUMENT STORAGE AND UPLOAD LIFECYCLE
+
+Use Cloudflare R2 with private buckets.
+
+Implement this upload workflow:
+
+1. Authenticate the user.
+2. Verify tenant membership and case access.
+3. Validate requested file metadata.
+4. Create a pending document record.
+5. Generate a short-lived presigned R2 upload URL.
+6. Upload directly from the browser or mobile client.
+7. Call a server-side upload-completion procedure.
+8. Verify object existence.
+9. Verify file signature and actual MIME type.
+10. Check size, page count and checksum.
+11. Apply malware or suspicious-file scanning through a supported security integration.
+12. Move the document into the approved processing state.
+13. Trigger extraction through the background workflow.
+
+Do not process files before upload verification and security checks have succeeded.
+
+## Required safeguards
+
+- Private R2 buckets.
+- Short-lived presigned URLs.
+- Object keys generated server-side.
+- Tenant-bound document ownership.
+- File size limits.
+- Page count limits.
+- PDF signature validation.
+- Checksum verification.
+- Duplicate upload detection.
+- Malformed-file rejection.
+- Malware scanning or quarantine integration.
+- Controlled document downloads.
+- No permanent public PDF URLs.
+
+Do not expose R2 access keys to client applications.
+
+Store document metadata, hashes and extraction provenance in D1.
+
+---
+
+# 8. GEMINI MULTIMODAL DOCUMENT EXTRACTION
+
+Use `@google/genai`.
+
+Implement native multimodal PDF/document understanding where appropriate.
+
+Supported document classes must include:
+- Invoices.
+- Purchase orders.
+- Delivery challans.
+- Lorry receipts.
+- Proof of delivery.
+- Payment receipts.
+- Bank payment references.
+- Buyer emails and correspondence.
+- Udyam certificates.
+- GST registration-related documents.
+- Other supporting records.
+
+## 8.1 Extraction fields
+
+For each relevant document, extract:
+- Document type.
+- Document number.
+- Document date.
+- Buyer details.
+- Seller details.
+- GSTINs, when supplied.
+- Udyam details, when supplied.
+- PO references.
+- Invoice references.
+- Line items.
+- Quantities.
+- Unit prices.
+- Tax details.
+- Total amounts.
+- Delivery references.
+- Payment details.
+- Acceptance information.
+- Objection information.
+
+Use Zod schemas as the authoritative validation layer.
+
+Convert Zod schemas to the supported structured-output schema representation where needed. Validate all model output locally before persistence.
+
+## 8.2 Field provenance
+
+Every extracted field must retain:
+- Document ID.
+- Page number.
+- Extracted value.
+- Validation status.
+- Review status.
+- Model ID.
+- Prompt version.
+- Extraction timestamp.
+
+For missing or ambiguous information, return `null` or `needs_review`.
+
+Never fabricate page references or source evidence.
+
+## 8.3 Hybrid extraction strategy
+
+For digital PDFs:
+- Extract embedded text where possible.
+- Preserve page information.
+- Use native multimodal analysis when necessary.
+
+For scanned PDFs:
+- Detect low-quality or insufficient text extraction.
+- If a page has fewer than 50 meaningful extracted characters, or another documented quality check indicates it is a scan, route that page to Gemini's multimodal PDF or image processing.
+- Preserve the original page and extraction evidence.
+
+Do not silently fail when text extraction returns no meaningful content.
+
+Do not unnecessarily resend an entire document when a page-level fallback is sufficient.
+
+## 8.4 Validation and re-extraction
+
+If extracted totals or fields conflict:
+1. Identify the exact conflicting field.
+2. Identify its source documents and pages.
+3. Request one targeted re-extraction using an explicit correction prompt.
+4. Revalidate the extracted value.
+5. If unresolved, create a finding with `needs_review`.
+
+Do not allow repeated extraction attempts to overwrite conflicting values until one appears plausible.
+
+---
+
+# 9. INTELLIGENT GEMINI MODEL ROUTING
+
+Implement configurable model routing inside `packages/ai/model-routing`.
+
+Do not use the most expensive model for every agent operation.
+
+Verify model availability, stability, capabilities, pricing and deprecation status against Google's official model catalogue before implementation and production deployment.
+
+Use the following as initial candidate tiers, not permanent dependencies:
+
+- Lightweight classification: `gemini-3.5-flash-lite`
+- Standard extraction: `gemini-3.8-flash`
+- Complex discrepancy reasoning: `gemini-4-argon`
+
+Model identifiers must be configurable through secrets or environment configuration. Do not hardcode a model into every agent.
+
+## Routing policy
+
+### Lightweight model
+
+Use for:
+- Document classification.
+- Basic routing.
+- Page categorization.
+- Simple metadata extraction.
+- Basic structured tasks.
+
+### Standard multimodal model
+
+Use for:
+- Invoice extraction.
+- Purchase-order extraction.
+- Delivery-document extraction.
+- Payment receipt extraction.
+- Multimodal table and layout interpretation.
+- Standard correspondence extraction.
+
+### Strong reasoning model
+
+Use only for:
+- Complex document ambiguity.
+- Material evidence discrepancies.
+- Conflicting transaction records.
+- Contextual evidence interpretation.
+- Difficult MSMED evidence explanations.
+
+The final report should be generated from verified structured data. Prefer deterministic templates or a standard-cost model for its narrative summary.
+
+Never use an LLM to calculate authoritative financial values or make a final legal determination.
+
+## Cost and latency controls
+
+Implement:
+- Per-model request tracking.
+- Token usage tracking.
+- Per-case AI cost tracking.
+- Per-tenant usage limits.
+- Budget alerts.
+- Request timeouts.
+- Bounded retries.
+- Exponential backoff.
+- Idempotency keys.
+- Safe caching of reusable classification results.
+- Prompt version tracking.
+- Model version tracking.
+- Evaluation and regression testing before model changes.
+
+Track:
+- Extraction accuracy.
+- Classification accuracy.
+- Discrepancy escalation rate.
+- Model latency.
+- Cost per document.
+- Cost per case.
+- Failed requests.
+- Re-extraction frequency.
+
+Never lower extraction quality silently because a cheaper model failed.
+
+---
+
+# 10. LANGGRAPH.JS AGENTIC WORKFLOW
+
+Implement a StateGraph inside `packages/ai`.
+
+The workflow must be observable, resumable and deterministic wherever possible.
+
+## 10.1 Graph state
+
+Include:
+- Tenant ID.
+- Case ID.
+- Analysis ID.
+- Thread ID.
+- Document IDs.
+- Extracted data.
+- Validation findings.
+- Evidence relationship records.
+- MSME registration checks.
+- Finance calculation output.
+- Agent events.
+- Reviewer corrections.
+- Approval state.
+- Report metadata.
+- Current workflow status.
+
+## 10.2 Required nodes
+
+### Node 1: `classifyDocuments`
+
+Classifies document types and selects the extraction strategy.
+
+### Node 2: `extractDocuments`
+
+Uses Gemini multimodal document processing.
+
+Produces structured, Zod-validated extraction results with page-level provenance.
+
+### Node 3: `validateInvoices`
+
+Checks:
+- Duplicate invoices.
+- Invoice numbering.
+- Invoice totals.
+- Line-item consistency.
+- Tax consistency.
+- PO references.
+- Buyer/seller identity.
+- Date conflicts.
+
+Perform deterministic calculations using application code.
+
+### Node 4: `verifyMsmeRegistration`
+
+Checks:
+- Udyam information.
+- Registration evidence.
+- Registration date.
+- Enterprise classification.
+- Registered activity.
+- GSTIN status.
+- Transaction-date conflicts.
+
+Returns warnings and human-review requirements.
+
+### Node 5: `reconcileEvidence`
+
+Reconciles:
+
+`Purchase Order → Invoice → Delivery Challan / LR / POD → Payment Receipt`
+
+Identifies:
+- Matched evidence.
+- Missing evidence.
+- Contradictory evidence.
+- Unverified evidence.
+- Unmatched payments.
+
+### Node 6: `verifyEvidence`
+
+Identifies missing supporting documents and evidence gaps.
+
+Examples:
+- Missing proof of delivery.
+- Missing PO.
+- Missing payment reference.
+- Missing buyer acknowledgement.
+- Unresolved delivery discrepancy.
+
+### Node 7: `calculateFinances`
+
+Calls only `packages/finance`.
+
+Calculates:
+- Invoice totals.
+- Principal outstanding.
+- Partial payments.
+- Outstanding balances.
+- Contractual payment status.
+- Section 15 date calculations.
+- Conditional Section 16 statutory-interest estimates.
+
+### Node 8: `prepareReport`
+
+Creates a structured case summary from verified findings.
+
+It must not invent missing information.
+
+### Human approval checkpoint
+
+Pause before final report generation.
+
+Use LangGraph's native human-in-the-loop interruption mechanism.
+
+The authorized user must:
+- Review findings.
+- Inspect document evidence.
+- Correct extracted fields.
+- Resolve warnings where appropriate.
+- Add reviewer notes.
+- Approve or reject the analysis.
+
+Only after explicit approval can the final report generation workflow proceed.
+
+## 10.3 Reflection loop
+
+When validation identifies a discrepancy:
+- Route to a targeted re-extraction node.
+- Revalidate once.
+- If unresolved, create a `needs_review` finding.
+
+Never permit unbounded reflection or repeated model attempts.
+
+## 10.4 Durable state
+
+Do not use Cloudflare KV as the authoritative LangGraph checkpoint store.
+
+Use D1 or Durable Objects with a tested checkpoint implementation that is compatible with the selected LangGraph version and runtime.
+
+Persist:
+- Checkpoints.
+- Thread IDs.
+- Workflow status.
+- Reviewer decisions.
+- Agent events.
+- Resume information.
+
+Use Cloudflare Workflows for durable long-running execution and waiting for reviewer events.
+
+Test:
+- Pause and resume.
+- Retry.
+- Process restart.
+- Timeout.
+- Duplicate job.
+- Concurrent review.
+- Database failure.
+
+Resume logic must be idempotent.
+
+Never create duplicate reports or findings when a workflow resumes.
+
+---
+
+# 11. DETERMINISTIC FINANCE ENGINE
+
+All financial logic must reside in `packages/finance`.
+
+Use:
+- `decimal.js` for currency and interest.
+- `date-fns` for date arithmetic.
+- Explicit rounding.
+- Reviewed legal calculation policies.
+- Unit tests and golden test cases.
+
+Proposed functions:
+
+```typescript
+calculateInvoiceTotal()
+calculateOutstandingPrincipal()
+allocatePayments()
+calculateContractualDueDate()
+calculateAcceptanceDate()
+calculateAppointedDay()
+calculateStatutoryPaymentDeadline()
+calculateMsmedInterest()
+calculateCaseFinancialSummary()
+```
+
+Do not use Gemini or another LLM for any of these operations.
+
+## 11.1 MSMED calculation output
+
+Return:
+
+```typescript
+interface MsmedCalculationResult {
+  principalAmountPaise: string;
+  outstandingAmountPaise: string;
+  acceptanceDate: string | null;
+  appointedDay: string | null;
+  contractualDueDate: string | null;
+  statutoryDeadline: string | null;
+  interestStartDate: string | null;
+  annualInterestRate: string | null;
+  compoundedInterestPaise: string | null;
+  applicableRatePeriods: unknown[];
+  paymentAllocations: unknown[];
+  assumptions: string[];
+  warnings: string[];
+  policyVersion: string;
+  requiresHumanReview: boolean;
+}
+```
+
+Replace `unknown` with proper typed models in the actual codebase.
+
+## 11.2 Required finance test scenarios
+
+Test:
+- No written agreement.
+- Written agreement of 15 days.
+- Written agreement of 45 days.
+- Written agreement exceeding 45 days.
+- Timely buyer objection.
+- Late buyer objection.
+- Objection resolution.
+- Partial payment.
+- Multiple payments.
+- Historical RBI rate changes.
+- Leap years.
+- Month-end dates.
+- Zero outstanding principal.
+- Invalid or missing dates.
+- Pre-registration transaction warning.
+- Unverified Udyam registration.
+- Unverified enterprise classification.
+
+Do not mark a statutory calculation as verified until it passes independently reviewed test cases.
+
+---
+
+# 12. tRPC API LAYER
+
+Implement typed tRPC routers in `packages/api`.
+
+The API Worker must create a secure context containing:
+- Authenticated user.
+- Active tenant.
+- Tenant membership.
+- Permissions.
+- Database access.
+- Storage bindings.
+- Workflow bindings.
+
+## 12.1 Cases router
+
+Procedures:
+
+- `cases.create`
+- `cases.list`
+- `cases.getById`
+- `cases.update`
+- `cases.archive`
+
+`cases.create` must derive tenant ownership from authenticated session context.
+
+## 12.2 Documents router
+
+Procedures:
+
+- `documents.getUploadUrl`
+- `documents.completeUpload`
+- `documents.list`
+- `documents.getById`
+- `documents.getDownloadUrl`
+- `documents.retryExtraction`
+
+All document procedures must verify case ownership.
+
+## 12.3 Analysis router
+
+Procedures:
+
+- `analysis.run`
+- `analysis.getResults`
+- `analysis.getEvents`
+- `analysis.getFindings`
+- `analysis.submitCorrections`
+- `analysis.approve`
+- `analysis.reject`
+- `analysis.resume`
+
+`analysis.run` triggers durable background execution rather than keeping a web request open during long-running analysis.
+
+`analysis.approve` must verify reviewer permission and record the approval event.
+
+## 12.4 Evidence router
+
+Procedures:
+
+- `evidence.getGraph`
+- `evidence.getMissingItems`
+- `evidence.getDocumentLinks`
+- `evidence.updateReviewStatus`
+
+## 12.5 Finance router
+
+Procedures:
+
+- `finance.getSummary`
+- `finance.getInvoiceBreakdown`
+- `finance.getInterestCalculation`
+- `finance.getCalculationHistory`
+
+These must call the deterministic finance package.
+
+## 12.6 Reports router
+
+Procedures:
+
+- `reports.generate`
+- `reports.list`
+- `reports.getDownloadUrl`
+- `reports.getVersion`
+
+Reports cannot be generated as final approved documents before the explicit approval gate.
+
+## 12.7 API standards
+
+Implement:
+- Zod input validation.
+- Tenant authorization middleware.
+- Consistent error responses.
+- Request tracing.
+- Pagination.
+- Idempotency for sensitive mutations.
+- Rate limiting.
+- Request size limits.
+- Structured operational logs.
+
+Never leak database errors, environment secrets or internal stack traces to clients.
+
+---
+
+# 13. WEB APPLICATION — NEXT.JS APP ROUTER
+
+Create a polished, responsive SaaS interface.
+
+Use:
+- Next.js App Router.
+- TypeScript.
+- Tailwind CSS.
+- shadcn/ui.
+- Framer Motion.
+- TanStack Query.
+- tRPC client.
+- Zustand.
+
+The interface should be professional, modern, trustworthy and optimized for business owners.
+
+Avoid excessive gradients, decorative animations and unnecessary visual elements.
+
+## 13.1 Required pages
+
+### Landing page
+- Product overview.
+- Features.
+- Security and privacy explanation.
+- How it works.
+- Login and registration actions.
+
+### Authentication
+- Sign up.
+- Login.
+- Logout.
+- Email verification.
+- Password reset.
+- Session management.
+
+### Dashboard
+Display:
+- Total cases.
+- Total invoices.
+- Outstanding principal.
+- Conditional statutory-interest estimates.
+- Cases requiring review.
+- Missing evidence.
+- Recent activity.
+
+Do not show fabricated metrics in production.
+
+### Case management
+- Create case.
+- Case listing.
+- Case details.
+- Case status.
+- Business details.
+- Transaction overview.
+
+### Document management
+- Drag-and-drop uploads.
+- Upload progress.
+- Document classification.
+- Extraction status.
+- Page references.
+- Document preview.
+- Missing-document indicators.
+
+### Invoice management
+- Invoice details.
+- Line items.
+- Amount breakdown.
+- Payment history.
+- Related PO.
+- Delivery references.
+
+### Evidence reconciliation
+Build an interactive evidence graph showing:
+
+`PO → Invoice → Delivery → Payment`
+
+Display statuses:
+- Matched.
+- Missing.
+- Contradictory.
+- Unverified.
+- Needs review.
+
+Example:
+
+`Invoice #102 → Missing Proof of Delivery`
+
+Clicking a finding should open the relevant source document and page where available.
+
+### Agent trace review
+Show:
+- Current analysis stage.
+- Executed nodes.
+- Agent events.
+- Extraction status.
+- Validation findings.
+- Finance calculation status.
+- Workflow failures.
+- Human approval state.
+
+Do not expose secrets, private prompts containing credentials or unnecessary chain-of-thought reasoning.
+
+Show concise explanations and factual execution events instead.
+
+### Review and approval
+Allow the reviewer to:
+- Open source evidence.
+- Inspect extracted values.
+- Correct information.
+- Add review notes.
+- Approve findings.
+- Reject findings.
+- Approve the case report.
+
+### Reports
+Show:
+- Internal Case Summary.
+- ODR-ready Evidence Index / Draft Annexure.
+- Report version.
+- Approval date.
+- Reviewer.
+- Download status.
+
+### Settings
+- Business profile.
+- GSTIN.
+- Udyam details.
+- Members.
+- Roles.
+- Subscription settings.
+- Notifications.
+
+---
+
+# 14. MOBILE APPLICATION — EXPO
+
+Build `apps/mobile` with Expo and React Native.
+
+The mobile application must consume the same API contracts, shared schemas and shared business-state packages as the web application.
+
+Implement:
+- Login and authentication.
+- Case dashboard.
+- Case listing.
+- Case creation.
+- Camera/document selection.
+- PDF upload.
+- Upload progress.
+- Document status.
+- Findings review.
+- Evidence checklist.
+- Financial summary.
+- Approval actions.
+- Report download and sharing.
+
+Use React Native Reanimated for meaningful transitions.
+
+Use secure platform storage for authentication/session secrets.
+
+Do not persist sensitive PDF content or authentication tokens in unprotected state storage.
+
+Build using Expo EAS.
+
+Test on both Android and iOS where supported.
+
+---
+
+# 15. REPORT GENERATION
+
+Implement report generation in `packages/reports`.
+
+Use an Edge-compatible PDF library only after testing its real runtime compatibility.
+
+If `@react-pdf/renderer` is incompatible with the selected Edge runtime, execute report generation in a supported Node.js environment or use another appropriately tested PDF library.
+
+Never compromise the report's integrity to force compatibility.
+
+## Report 1: Internal Case Summary
+
+Include:
+- Business information.
+- Case reference.
+- Buyer and supplier.
+- Invoice ledger.
+- Outstanding principal.
+- Payments and allocations.
+- Conditional interest estimate.
+- Calculation assumptions.
+- Timeline.
+- Evidence relationships.
+- Missing records.
+- Contradictions.
+- Review notes.
+- Approval details.
+- Source document references.
+- Page references.
+
+## Report 2: ODR-ready Evidence Index / Draft Annexure
+
+Include:
+- Supplier details.
+- Buyer details.
+- Udyam registration information.
+- Invoice index.
+- PO-to-invoice mapping.
+- Delivery evidence index.
+- Payment evidence index.
+- Transaction chronology.
+- Outstanding amount summary.
+- Conditional interest calculation.
+- Supporting-document checklist.
+- Missing evidence.
+- Reviewer verification status.
+
+Do not claim this is an official government form or automatically submit it to the MSME ODR or Samadhaan portal.
+
+## Report integrity
+
+Every report must record:
+- Report version.
+- Case ID.
+- Analysis ID.
+- Calculation policy version.
+- Model and prompt versions.
+- Source document identifiers.
+- Reviewer identity.
+- Approval timestamp.
+
+Previously approved reports must remain available as immutable historical versions.
+
+A re-analysis creates a new version, not an invisible modification of an approved report.
+
+---
+
+# 16. SECURITY, PRIVACY AND PRODUCTION RELIABILITY
+
+Treat this product as a sensitive financial-document platform.
+
+Implement:
+
+## Authentication and authorization
+- Secure session management.
+- Email verification.
+- Session expiry.
+- Trusted origins.
+- Tenant membership verification.
+- Role-based access control.
+- Reviewer permissions.
+- Server-side authorization on every protected procedure.
+
+## Tenant isolation
+- Tenant-scoped database access.
+- Tenant-scoped storage keys.
+- Document ownership verification.
+- Report ownership verification.
+- Cross-tenant access tests.
+- No client-controlled tenant access.
+
+## File security
+- Private R2 buckets.
+- File signature validation.
+- Size and page limits.
+- Malware scanning or quarantine.
+- Short-lived download URLs.
+- Secure deletion procedures.
+
+## API security
+- Rate limiting.
+- Request validation.
+- CSRF/CORS configuration.
+- Idempotency.
+- Webhook signature verification.
+- Error redaction.
+- Request-size limits.
+
+## Secrets
+- Never commit `.env` files containing real credentials.
+- Never expose Gemini API keys to frontend code.
+- Never expose database or R2 credentials to clients.
+- Use separate secrets for development, staging and production.
+
+## AI security
+- Treat uploaded documents as untrusted input.
+- Resist prompt injection embedded in PDFs and correspondence.
+- Do not allow document content to change system instructions.
+- Prevent AI tools from executing arbitrary code or unauthorized actions.
+- Validate tool arguments.
+- Keep document extraction separate from authorization.
+- Do not send unnecessary private information to external AI services.
+- Record model and prompt versions.
+
+## Privacy and compliance operations
+Implement:
+- Clear privacy notice.
+- Document retention policy.
+- Tenant data export.
+- Account deletion workflow.
+- Secure document deletion.
+- Access audit history.
+- Operational log redaction.
+- Appropriate legal review of Indian data protection obligations.
+
+## Reliability
+Implement:
+- Structured logs.
+- Error monitoring.
+- Workflow retries.
+- Dead-letter queue.
+- Duplicate-job protection.
+- Durable checkpoints.
+- Database migration control.
+- Backup and restore procedures.
+- Health checks.
+- Alerting.
+- Operational runbooks.
+
+## Subscription billing
+
+If SaaS billing is implemented:
+- Verify payment provider webhook signatures.
+- Use idempotent webhook processing.
+- Store subscription events.
+- Handle failed, expired and cancelled subscriptions.
+- Never use subscription payment features to collect users' MSME customer invoices.
+
+---
+
+# 17. OPTIONAL FEATURES — DO NOT PRIORITIZE BEFORE CORE COMPLETION
+
+These are optional enhancements after the core application passes its acceptance tests:
+
+- 45-second audio executive case briefing.
+- Gemini or another supported TTS provider.
+- Email notifications.
+- Subscription plans.
+- Advanced financial dashboards.
+- Multi-case analytics.
+- Additional OCR and document-processing providers.
+- Advanced buyer-payment behaviour summaries.
+
+Audio summaries must only be generated from approved case information.
+
+Do not let optional features delay the working document-processing, finance, evidence and review workflow.
+
+---
+
+# 18. TESTING STRATEGY
+
+Use:
+
+- Vitest for unit and integration tests.
+- Playwright for web end-to-end tests.
+- Maestro for mobile end-to-end tests.
+- Biome for formatting and linting.
+- TypeScript strict mode.
+- GitHub Actions for CI/CD.
+
+## 18.1 Unit tests
+
+Test:
+- Zod schemas.
+- GSTIN validation.
+- Udyam identity validation.
+- Date calculations.
+- Finance functions.
+- Payment allocations.
+- Invoice totals.
+- Evidence relationships.
+- Model routing decisions.
+- Report construction.
+
+## 18.2 Finance golden tests
+
+Use independently reviewed test fixtures for:
+- Section 15 written agreements.
+- The 45-day maximum.
+- The appointed-day rule.
+- Timely and late objections.
+- Acceptance-date changes.
+- Section 16 interest start date.
+- Compound monthly rests.
+- Partial payments.
+- Historical Bank Rate changes.
+- Month-end behaviour.
+- Leap years.
+- Rounding behaviour.
+- Missing transaction dates.
+- Udyam registration-date conflicts.
+
+Do not certify financial calculations from test cases created solely by the same implementation that is being tested.
+
+## 18.3 AI evaluation tests
+
+Maintain a synthetic and manually reviewed document dataset.
+
+Measure:
+- Document classification accuracy.
+- Invoice extraction accuracy.
+- Date extraction accuracy.
+- Amount extraction accuracy.
+- GSTIN extraction accuracy.
+- Udyam extraction accuracy.
+- Page reference accuracy.
+- Missing-field detection.
+- Hallucination rate.
+- Escalation rate.
+- Re-extraction success.
+- Cost and latency.
+
+Use synthetic or appropriately anonymized documents during development.
+
+## 18.4 Security tests
+
+Verify:
+- Tenant isolation.
+- Unauthorized case access.
+- Unauthorized document download.
+- Expired presigned URLs.
+- Invalid file uploads.
+- Prompt injection resistance.
+- Rate limiting.
+- Authentication expiry.
+- Reviewer permission enforcement.
+- Webhook validation.
+- Secret exposure prevention.
+
+## 18.5 Integration tests
+
+Test the complete workflow:
+
+Upload → Validate → Extract → Reconcile → Calculate → Review → Approve → Generate PDF.
+
+Also test:
+- Failed extraction.
+- Missing document.
+- Invalid invoice.
+- Conflicting PO.
+- Partial payment.
+- Missing proof of delivery.
+- Model timeout.
+- Workflow retry.
+- Graph interruption.
+- Human correction.
+- Resume after correction.
+- Duplicate approval.
+- Report versioning.
+
+## 18.6 Mandatory cross-platform tests
+
+Verify:
+1. Web and mobile consume the same Zod schemas.
+2. Web and mobile use the same typed router contracts.
+3. Neither client duplicates endpoint definitions.
+4. Both applications use the shared finance-related types.
+5. The mobile app does not import browser-only modules.
+6. The web app does not import React Native-only modules.
+7. No frontend imports server-only database or secret modules.
+
+---
+
+# 19. CI/CD AND ENVIRONMENT MANAGEMENT
+
+Implement GitHub Actions.
+
+For every pull request, execute:
+
+1. Install dependencies from the committed pnpm lockfile.
+2. Biome formatting check.
+3. Biome lint.
+4. TypeScript type checking.
+5. Unit tests.
+6. Database migration validation.
+7. API integration tests.
+8. Package-boundary checks.
+9. Production build.
+10. Relevant end-to-end tests.
+
+Use separate environments:
+
+### Local development
+- Local D1 database.
+- Development R2 bucket or supported storage mock.
+- Local workflow execution.
+- Test Gemini credentials.
+- Synthetic demo data.
+
+### Preview / staging
+- Isolated database.
+- Isolated storage.
+- Restricted test accounts.
+- Preview deployment.
+- Automated smoke tests.
+
+### Production
+- Production D1.
+- Production R2.
+- Production Workflows and Queues.
+- Production secrets.
+- Monitoring and alerts.
+- Backup and restore policies.
+
+Never reuse production credentials in development.
+
+Never use real confidential business documents in public demo environments.
+
+Implement controlled migrations and deployment rollback procedures.
+
+---
+
+# 20. PHASE-BY-PHASE IMPLEMENTATION PLAN
+
+Execution must be incremental.
+
+**Implement only one phase at a time. Stop after completing each phase and wait for my review.**
+
+Do not start the next phase automatically.
+
+## PHASE 0 — ARCHITECTURE AND COMPATIBILITY VALIDATION
+
+Before scaffolding:
+
+1. Inspect the working directory and existing files.
+2. Identify existing code that should be preserved.
+3. Verify current versions and compatibility of the required technologies.
+4. Produce the final architecture decision record.
+5. Produce a package dependency diagram.
+6. Verify the chosen hosting runtime.
+7. Test a minimal Next.js deployment path.
+8. Test Better Auth with D1.
+9. Test Drizzle migrations.
+10. Test tRPC server and client compatibility.
+11. Verify LangGraph.js execution in the planned runtime.
+12. Verify durable checkpoint storage.
+13. Verify Gemini native PDF processing.
+14. Verify background workflow execution.
+15. Verify PDF generation compatibility.
+16. Define the environment and deployment strategy.
+
+Deliver:
+- Architecture decision record.
+- Runtime compatibility matrix.
+- Deployment topology.
+- Proposed monorepo tree.
+- Database design overview.
+- Security boundary diagram.
+- Environment variable inventory.
+- Identified risks and mitigations.
+
+Stop and ask for review.
+
+## PHASE 1 — TURBOREPO AND DATABASE FOUNDATION
+
+Implement:
+- Turborepo.
+- pnpm workspaces.
+- TypeScript configuration.
+- Biome.
+- Shared packages.
+- Drizzle ORM.
+- Drizzle Kit.
+- Cloudflare D1 bindings.
+- Database migrations.
+- Authentication schema.
+- Tenant schema.
+- Core domain models.
+- Finance and audit schemas.
+- Local development scripts.
+
+Acceptance criteria:
+- Workspace installs successfully.
+- All packages compile.
+- D1 is accessible locally.
+- Migrations execute successfully.
+- Database schemas pass validation.
+- Tenant relationships work.
+- No circular package dependencies.
+
+Stop and ask for review.
+
+## PHASE 2 — AUTHENTICATION, BACKEND AND STORAGE
+
+Implement:
+- Better Auth.
+- Session handling.
+- Tenant membership.
+- RBAC.
+- tRPC context and middleware.
+- Cases router.
+- Documents router.
+- R2 storage integration.
+- Presigned upload lifecycle.
+- Upload completion.
+- File validation.
+- Secure download.
+- API rate limiting.
+
+Acceptance criteria:
+- User registration and login work.
+- Authenticated tenant can create a case.
+- Unauthorized tenant cannot access another tenant's case.
+- PDF upload works through R2.
+- Upload verification works.
+- Documents persist correctly.
+- API schemas and types work.
+
+Stop and ask for review.
+
+## PHASE 3 — FINANCE ENGINE, GEMINI AND LANGGRAPH
+
+Implement:
+- `decimal.js` finance engine.
+- Date calculations.
+- RBI Bank Rate history.
+- MSMED Section 15 calculations.
+- MSMED Section 16 interest estimates.
+- Udyam registration validation.
+- GSTIN validation and status.
+- Eligibility warning logic.
+- Gemini document extraction.
+- Hybrid scanned-page fallback.
+- Intelligent model routing.
+- Evidence reconciliation.
+- LangGraph graph nodes.
+- Durable checkpointing.
+- Cloudflare Workflows.
+- Human approval interruption.
+
+Acceptance criteria:
+- Finance golden tests pass.
+- Extraction schemas validate.
+- Source page references persist.
+- Missing data is not invented.
+- Evidence links are created accurately.
+- Model routing works.
+- The graph pauses for review.
+- The graph resumes without duplicate processing.
+
+Stop and ask for review.
+
+## PHASE 4 — WEB FRONTEND
+
+Implement:
+- Next.js App Router.
+- Design system.
+- Authentication screens.
+- Dashboard.
+- Case management.
+- Document upload.
+- Document preview.
+- Invoice management.
+- Evidence reconciliation graph.
+- Agent trace review.
+- Financial breakdown.
+- Reviewer corrections.
+- Human approval.
+- Report listing.
+
+Acceptance criteria:
+- Complete web workflow functions through real APIs.
+- No production path uses fabricated data.
+- Loading, empty, success and error states work.
+- Tenant permissions are respected.
+- The application works at desktop and mobile browser sizes.
+- E2E tests pass.
+
+Stop and ask for review.
+
+## PHASE 5 — MOBILE AND REPORT GENERATION
+
+Implement:
+- Expo application.
+- Shared API client.
+- Shared schemas.
+- Shared Zustand state.
+- Secure mobile authentication.
+- Document selection and upload.
+- Case review.
+- Evidence checklist.
+- Finance summary.
+- Reviewer actions.
+- PDF generation.
+- Internal Case Summary.
+- ODR-ready Evidence Index.
+
+Acceptance criteria:
+- Mobile authentication works.
+- Upload works.
+- API contracts match the web application.
+- Mobile UI works on supported targets.
+- Approved reports are generated.
+- Historical report versions remain intact.
+
+Stop and ask for review.
+
+## PHASE 6 — PRODUCTION HARDENING AND DEPLOYMENT
+
+Implement:
+- GitHub Actions.
+- Staging deployment.
+- Production deployment configuration.
+- Domain configuration.
+- Secrets setup.
+- Rate limiting.
+- Security verification.
+- Monitoring.
+- Error reporting.
+- Database backup.
+- Restore testing.
+- Workflow recovery.
+- Dead-letter handling.
+- Load testing.
+- Security review.
+- User documentation.
+- Operations runbooks.
+
+Acceptance criteria:
+- All required tests pass.
+- Cross-tenant access tests pass.
+- Financial calculations pass independent review.
+- File storage is private.
+- AI secrets remain server-side.
+- Workflow recovery works.
+- Report approval is enforced.
+- Backup and restore are demonstrated.
+- Staging smoke tests pass.
+- Production deployment is verified.
+
+Stop and provide the final release report.
+
+---
+
+# 21. EXECUTION CONTRACT FOR THE AI CODING AGENT
+
+These instructions are mandatory.
+
+## Build discipline
+
+- Work directly in the existing repository when one is provided.
+- Inspect existing files before creating or modifying anything.
+- Preserve working code.
+- Do not overwrite existing configurations without inspecting them.
+- Follow the approved package architecture.
+- Use compatible, pinned dependency versions.
+- Prefer small, testable implementations.
+- Write maintainable, strongly typed code.
+- Include useful comments for complex business rules.
+- Handle errors explicitly.
+- Avoid unnecessary dependencies.
+
+## Implementation discipline
+
+Do not:
+- Generate the entire codebase in one unreviewed pass.
+- Create empty or fake implementations and claim success.
+- Use hardcoded production credentials.
+- Create nonfunctional UI controls.
+- Put database access in frontend components.
+- Allow LLMs to perform financial arithmetic.
+- Hardcode a single Bank Rate for historical cases.
+- Ignore failed tests.
+- Suppress TypeScript errors to force a build.
+- Claim deployment succeeded without verifying it.
+- Claim production readiness without the release checklist.
+
+## If credentials are unavailable
+
+- Build the actual integration boundary.
+- Provide a clearly identified local mock only for development.
+- Do not fabricate production success responses.
+- Explain the required credentials and configuration.
+- Preserve the production integration path.
+
+## At the end of every phase
+
+Provide:
+
+1. Phase completion summary.
+2. Exact files created.
+3. Exact files modified.
+4. Architecture decisions.
+5. Database changes.
+6. API changes.
+7. Commands to run locally.
+8. Tests executed.
+9. Actual test results.
+10. Known limitations.
+11. Security considerations.
+12. Next phase plan.
+
+Stop and wait for explicit approval before continuing.
+
+## Final project completion report
+
+After Phase 6, provide:
+- Final architecture diagram.
+- Final monorepo tree.
+- Deployed application URLs.
+- API documentation.
+- Database migration summary.
+- Environment setup guide.
+- Test coverage summary.
+- Finance validation summary.
+- AI evaluation summary.
+- Security assessment.
+- Known limitations.
+- Backup and recovery instructions.
+- Deployment and rollback instructions.
+- Production-readiness checklist.
+
+Only mark the project production-ready when all critical acceptance criteria have been demonstrated.
+
+---
+
+# 22. FINAL PRODUCT ACCEPTANCE CRITERIA
+
+DuesGuard AI is functionally complete only when the following end-to-end scenario succeeds:
+
+1. A business owner registers and creates a tenant.
+2. The owner creates a payment-dispute case.
+3. The owner uploads a purchase order, invoice, delivery proof and payment receipt.
+4. Files are securely stored in private R2 storage.
+5. Gemini extracts structured information with page-level references.
+6. Zod validates model output.
+7. The backend reconciles PO, invoice, delivery and payment relationships.
+8. The MSME verification module checks supplied Udyam and GST information.
+9. The finance engine calculates balances and conditional statutory-interest estimates.
+10. The evidence engine flags missing or contradictory records.
+11. LangGraph records agent execution events and pauses for review.
+12. The authorized reviewer inspects evidence and findings.
+13. The reviewer corrects records and approves the analysis.
+14. The workflow resumes.
+15. The PDF generation service creates the approved report.
+16. The report is securely stored and versioned.
+17. The reviewer downloads the report.
+18. The audit log records the entire process.
+19. Another tenant cannot access the case, documents or report.
+20. The same business workflow is available through the mobile application.
+
+The final product must be a functioning, secure, tested application with a single source of truth for business logic and API contracts.
+
+**Begin with PHASE 0 only. Do not scaffold the entire project until the architecture and runtime compatibility decisions have been reviewed and approved.**

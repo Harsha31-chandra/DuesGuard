@@ -1,0 +1,6 @@
+{
+  "name": "DuesGuard AI",
+  "description": "MSMED Delayed Payment Financial Intelligence, Deterministic Statutory Interest & Evidence-Ready Resolution Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

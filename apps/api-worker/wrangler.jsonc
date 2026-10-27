@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "duesguard-api-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "duesguard-d1-prod",
+      "database_id": "00000000-0000-0000-0000-duesguard001",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS_BUCKET",
+      "bucket_name": "duesguard-private-evidence-r2"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE_KV",
+      "id": "duesguard-non-authoritative-cache"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "duesguard-case-analysis-workflow",
+      "binding": "ANALYSIS_WORKFLOW",
+      "class_name": "CaseAnalysisWorkflow"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "duesguard-document-ingestion",
+        "binding": "INGESTION_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "duesguard-document-ingestion",
+        "max_batch_size": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "duesguard-document-dlq"
+      }
+    ]
+  },
+  "vars": {
+    "MODEL_LIGHTWEIGHT": "gemini-3.1-flash-lite",
+    "MODEL_STANDARD": "gemini-3.8-flash",
+    "MODEL_REASONING": "gemini-4-argon",
+    "MSMED_POLICY_VERSION": "MSMED_ACT_2006_SEC_15_16_V2.1"
+  }
+}
