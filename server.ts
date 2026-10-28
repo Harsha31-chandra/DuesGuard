@@ -81,6 +81,9 @@ async function startServer() {
     const auditLogs = db.getAuditLogs(req.params.id);
     const chatHistory = db.getChatHistory(req.params.id);
     const tenants = db.getTenants();
+    const customers = db.getCustomers();
+    const products = db.getProducts();
+    const reminderLogs = db.getReminderLogs(req.params.id);
 
     res.json({
       case: caseRecord,
@@ -95,6 +98,9 @@ async function startServer() {
       auditLogs,
       chatHistory,
       tenants,
+      customers,
+      products,
+      reminderLogs,
     });
   });
 
@@ -582,6 +588,152 @@ async function startServer() {
     } catch (err: any) {
       const status = err.httpStatus || 400;
       res.status(status).json({ error: err.message || 'Demo payment simulation failed' });
+    }
+  });
+
+  // --- MERGED DUESGAURD ERP: CUSTOMERS, PRODUCTS, GST TAX INVOICES & REMINDER SCHEDULER ---
+
+  // Customers CRUD
+  app.get('/api/customers', (_req, res) => {
+    res.json(db.getCustomers());
+  });
+
+  app.post('/api/customers', (req, res) => {
+    try {
+      if (!req.body.name || !String(req.body.name).trim()) {
+        return res.status(400).json({ error: 'Customer name is required.' });
+      }
+      const created = db.addCustomer(req.body);
+      res.status(201).json(created);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/customers/:id', (req, res) => {
+    const updated = db.updateCustomer(req.params.id, req.body);
+    if (!updated) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    res.json(updated);
+  });
+
+  // Products CRUD
+  app.get('/api/products', (_req, res) => {
+    res.json(db.getProducts());
+  });
+
+  app.post('/api/products', (req, res) => {
+    try {
+      if (!req.body.name || !String(req.body.name).trim()) {
+        return res.status(400).json({ error: 'Product / service item name is required.' });
+      }
+      const created = db.addProduct(req.body);
+      res.status(201).json(created);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/products/:id', (req, res) => {
+    const deleted = db.deleteProduct(req.params.id);
+    res.json({ deleted });
+  });
+
+  // Authoritative GST Tax Invoice Generation (Intra-State CGST+SGST vs Inter-State IGST)
+  app.post('/api/cases/:id/invoices/generate', (req, res) => {
+    try {
+      const { items, invoiceDate, dueDate } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'At least one invoice line item is required.' });
+      }
+      if (!invoiceDate || !dueDate) {
+        return res.status(400).json({ error: 'invoiceDate and dueDate are required.' });
+      }
+      const result = db.generateGstInvoice(req.params.id, req.body);
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Automated Overdue Email Reminder Scheduler & Durable Audit Logs
+  app.get('/api/cases/:id/reminders', (req, res) => {
+    res.json(db.getReminderLogs(req.params.id));
+  });
+
+  app.post('/api/cases/:id/reminders/trigger', (req, res) => {
+    try {
+      const asOfDate = req.body.asOfDate || '2024-04-15';
+      const result = db.triggerReminderSchedulerCycle(req.params.id, asOfDate);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/cases/:id/reminders/send-notice', async (req, res) => {
+    try {
+      const logEntry = db.sendManualOrTestReminder(req.params.id, req.body);
+
+      // If RESEND_API_KEY is configured in environment and not already sent via client Gmail API, dispatch via Resend REST API with soft-copy PDF attachment
+      if (
+        process.env.RESEND_API_KEY &&
+        logEntry.recipientEmail &&
+        !String(req.body.providerMessageId || '').startsWith('gmail_')
+      ) {
+        try {
+          const attachments = req.body.softCopyBase64Pdf
+            ? [
+                {
+                  filename:
+                    req.body.softCopyFilename ||
+                    `Buyer_Reminder_Bill_${logEntry.invoiceNumber}.pdf`,
+                  content: req.body.softCopyBase64Pdf,
+                },
+              ]
+            : undefined;
+          const resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: process.env.REMINDER_FROM_EMAIL || 'DuesGuard AI <notices@duesguard.ai>',
+              to: [logEntry.recipientEmail],
+              subject: logEntry.subject,
+              html: logEntry.bodyHtml,
+              text: logEntry.messageText,
+              ...(attachments ? { attachments } : {}),
+            }),
+          });
+          if (resendRes.ok) {
+            const resendData = (await resendRes.json()) as { id?: string };
+            if (resendData?.id) {
+              logEntry.providerMessageId = `resend_${resendData.id}`;
+            }
+          }
+        } catch (emailErr) {
+          console.warn('Resend API dispatch warning (recorded in durable audit log):', emailErr);
+        }
+      }
+
+      res.status(201).json({
+        logEntry,
+        allLogs: db.getReminderLogs(req.params.id),
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/cases/:id/reminders/broadcast-overdue', (req, res) => {
+    try {
+      const result = db.broadcastOverdueReminders(req.params.id, req.body);
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
     }
   });
 

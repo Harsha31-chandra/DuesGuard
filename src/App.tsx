@@ -15,8 +15,10 @@ import {
   FileSpreadsheet,
   MessageSquare,
   Layers,
-  Sparkles,
   Building2,
+  Receipt,
+  Users,
+  Mail,
 } from 'lucide-react';
 import type {
   ActiveWorkspaceSession,
@@ -26,11 +28,15 @@ import type {
   ChatMessage,
   ChatModelTier,
   ChatRolePersona,
+  CustomerRecord,
+  EmailReminderLogRecord,
+  EmailReminderRuleType,
   Finding,
   InvoiceRecord,
+  ProductItemRecord,
+  ReminderDeliveryChannel,
   TenantRecord,
 } from './types/index.ts';
-import { Header } from './components/Header.tsx';
 import { DashboardView } from './components/DashboardView.tsx';
 import { DocumentsView } from './components/DocumentsView.tsx';
 import { EvidenceGraphView } from './components/EvidenceGraphView.tsx';
@@ -46,11 +52,17 @@ import { AuthGateScreen } from './components/AuthGateScreen.tsx';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal.tsx';
 import { NewCaseModal } from './components/NewCaseModal.tsx';
 import { ThemeProvider } from './components/ThemeProvider.tsx';
-import { FloatingNavbar } from './components/FloatingNavbar.tsx';
 import { FloatingAssistantPopup } from './components/FloatingAssistantPopup.tsx';
 import { QrPaymentModal } from './components/QrPaymentModal.tsx';
 import { DemoPaymentPage } from './components/DemoPaymentPage.tsx';
-import { ROLE_LABELS } from './services/workspaceAuth.ts';
+import {
+  EnterpriseSidebar,
+  WorkspaceTopBar,
+  type SidebarNavItem,
+} from './components/EnterpriseSidebar.tsx';
+import { InvoicesBillingView } from './components/InvoicesBillingView.tsx';
+import { CustomersProductsView } from './components/CustomersProductsView.tsx';
+import { OverdueRemindersView } from './components/OverdueRemindersView.tsx';
 
 export default function App() {
   const [cases, setCases] = useState<CaseRecord[]>([]);
@@ -67,6 +79,9 @@ export default function App() {
     findings: Finding[];
     evidenceLinks: any[];
     latestAnalysis: AnalysisRun | null;
+    customers?: CustomerRecord[];
+    products?: ProductItemRecord[];
+    reminderLogs?: EmailReminderLogRecord[];
   } | null>(null);
 
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -84,6 +99,17 @@ export default function App() {
   const [previewDocument, setPreviewDocument] = useState<CaseDocument | null>(null);
   const [isNewCaseModalOpen, setIsNewCaseModalOpen] = useState<boolean>(false);
   const [qrModalInvoiceId, setQrModalInvoiceId] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [openInvoiceGeneratorOnMount, setOpenInvoiceGeneratorOnMount] = useState<boolean>(false);
+  const [preselectedCustomerForInvoice, setPreselectedCustomerForInvoice] = useState<string | null>(
+    null
+  );
+  const [preselectedInvoiceForReminder, setPreselectedInvoiceForReminder] = useState<string | null>(
+    null
+  );
+  const [preselectedCustomerForReminder, setPreselectedCustomerForReminder] = useState<
+    string | null
+  >(null);
   const [demoPayToken, setDemoPayToken] = useState<string | null>(() => {
     const match = window.location.pathname.match(/^\/demo-pay\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -180,9 +206,11 @@ export default function App() {
     }
   };
 
-  // Fetch active case details
+  // Fetch active case details (without unmounting active view on background refresh)
   const fetchCaseDetails = async (caseId: string) => {
-    setIsLoading(true);
+    if (!caseData || caseData.case.id !== caseId) {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch(`/api/cases/${caseId}`);
       if (res.ok) {
@@ -401,6 +429,160 @@ export default function App() {
     }
   };
 
+  // Generate Authoritative GST Invoice
+  const handleGenerateGstInvoice = async (payload: {
+    customerId?: string;
+    buyerName?: string;
+    buyerGstin?: string;
+    buyerState?: string;
+    buyerEmail?: string;
+    sellerState?: string;
+    invoiceNumber?: string;
+    invoiceDate: string;
+    dueDate: string;
+    poReference?: string;
+    deliveryReference?: string;
+    paymentStatus?: 'unpaid' | 'paid';
+    items: Array<{
+      productId?: string;
+      sku?: string;
+      description: string;
+      quantity: number;
+      unit?: string;
+      unitPricePaise: string;
+      costPricePaise?: string;
+      taxRatePercent: number;
+    }>;
+  }): Promise<InvoiceRecord | null> => {
+    if (!activeCaseId) return null;
+    const res = await fetch(`/api/cases/${activeCaseId}/invoices/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, asOfDate }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to generate GST invoice');
+    }
+    const data = await res.json();
+    await fetchCaseDetails(activeCaseId);
+    return data.invoice || null;
+  };
+
+  // Add Customer
+  const handleAddCustomer = async (customer: Partial<CustomerRecord>) => {
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...customer,
+        organizationId: workspaceSession?.activeOrganization?.id || 'org-apex-001',
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to add customer');
+    }
+    if (activeCaseId) {
+      await fetchCaseDetails(activeCaseId);
+    }
+  };
+
+  // Add Product SKU
+  const handleAddProduct = async (product: Partial<ProductItemRecord>) => {
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...product,
+        organizationId: workspaceSession?.activeOrganization?.id || 'org-apex-001',
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to add product');
+    }
+    if (activeCaseId) {
+      await fetchCaseDetails(activeCaseId);
+    }
+  };
+
+  // Delete Product SKU
+  const handleDeleteProduct = async (productId: string) => {
+    const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
+    if (res.ok && activeCaseId) {
+      await fetchCaseDetails(activeCaseId);
+    }
+  };
+
+  // Trigger Automated 5-Stage Overdue Reminder Scheduler Cycle
+  const handleTriggerReminderCycle = async () => {
+    if (!activeCaseId) return { dispatchedCount: 0, skippedDuplicateCount: 0 };
+    const res = await fetch(`/api/cases/${activeCaseId}/reminders/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asOfDate }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to trigger reminder cycle');
+    }
+    const data = await res.json();
+    await fetchCaseDetails(activeCaseId);
+    return {
+      dispatchedCount: data.dispatchedCount || 0,
+      skippedDuplicateCount: data.skippedDuplicateCount || 0,
+    };
+  };
+
+  // Send Manual or Test Reminder Notice (Email, WhatsApp, SMS, or Multi-Channel)
+  const handleSendManualReminder = async (params: {
+    invoiceId: string;
+    recipientEmail: string;
+    recipientPhone?: string;
+    channel?: ReminderDeliveryChannel;
+    reminderType?: EmailReminderRuleType;
+    customSubject?: string;
+    customNote?: string;
+    paymentPortalUrl?: string;
+    providerMessageId?: string;
+    softCopyBase64Pdf?: string;
+    softCopyFilename?: string;
+  }) => {
+    if (!activeCaseId) return;
+    const res = await fetch(`/api/cases/${activeCaseId}/reminders/send-notice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...params, asOfDate }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to dispatch statutory notice');
+    }
+    await fetchCaseDetails(activeCaseId);
+  };
+
+  // Broadcast Reminders across all unpaid/overdue invoices
+  const handleBroadcastAllOverdue = async (params: {
+    channel: ReminderDeliveryChannel;
+    customNote?: string;
+    baseUrl?: string;
+  }) => {
+    if (!activeCaseId) return { dispatchedCount: 0 };
+    const res = await fetch(`/api/cases/${activeCaseId}/reminders/broadcast-overdue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...params, asOfDate }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to broadcast overdue reminders');
+    }
+    const data = await res.json();
+    await fetchCaseDetails(activeCaseId);
+    return { dispatchedCount: data.dispatchedCount || 0 };
+  };
+
   const activeCase = caseData?.case || cases.find((c) => c.id === activeCaseId) || null;
   const analysis = caseData?.latestAnalysis || null;
   const invoices = caseData?.invoices || [];
@@ -409,43 +591,75 @@ export default function App() {
   const purchaseOrders = caseData?.purchaseOrders || [];
   const evidenceLinks = caseData?.evidenceLinks || [];
   const findings = caseData?.findings || [];
+  const customers = caseData?.customers || [];
+  const products = caseData?.products || [];
+  const reminderLogs = caseData?.reminderLogs || [];
 
-  const navTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  const navTabs: SidebarNavItem[] = [
+    { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard, group: 'overview' },
     {
-      id: 'auth-workspaces',
-      label: 'Workspaces',
-      icon: Building2,
-      count: workspaceSession?.accessibleOrganizations.length,
+      id: 'invoices-billing',
+      label: 'GST Tax Invoices',
+      icon: Receipt,
+      count: invoices.length,
+      group: 'erp',
     },
-    { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
-    { id: 'evidence', label: 'Evidence', icon: GitFork },
-    { id: 'finance', label: 'MSMED Finance', icon: Calculator },
-    { id: 'compliance', label: 'Udyam & GST', icon: ShieldCheck },
-    { id: 'trace', label: 'Workflow', icon: Cpu },
+    {
+      id: 'customers-products',
+      label: 'Customers & Catalogue',
+      icon: Users,
+      count: customers.length + products.length,
+      group: 'erp',
+    },
+    {
+      id: 'reminders',
+      label: 'Overdue Reminders',
+      icon: Mail,
+      count: reminderLogs.length,
+      group: 'erp',
+    },
+    {
+      id: 'documents',
+      label: 'Document Vault',
+      icon: FileText,
+      count: documents.length,
+      group: 'msmed',
+    },
+    { id: 'evidence', label: 'Evidence Graph', icon: GitFork, group: 'msmed' },
+    { id: 'finance', label: 'MSMED Interest Engine', icon: Calculator, group: 'msmed' },
+    { id: 'compliance', label: 'Udyam & GST Audit', icon: ShieldCheck, group: 'msmed' },
+    { id: 'trace', label: 'Agent Pipeline', icon: Cpu, group: 'workflow' },
     {
       id: 'review',
-      label: 'Review Gate',
+      label: 'Human Review Gate',
       icon: UserCheck,
       badge: analysis?.approvalStatus === 'approved' ? 'Approved' : 'Pending',
+      group: 'workflow',
     },
-    { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
+    { id: 'reports', label: 'ODR & PDF Annexures', icon: FileSpreadsheet, group: 'workflow' },
     {
       id: 'chatbot',
-      label: 'AI Chat',
+      label: 'AI Legal Assistant',
       icon: MessageSquare,
       count: chatHistory.length,
+      group: 'workflow',
+    },
+    {
+      id: 'auth-workspaces',
+      label: 'Org & RBAC Workspaces',
+      icon: Building2,
+      count: workspaceSession?.accessibleOrganizations.length,
+      group: 'platform',
     },
     {
       id: 'architecture',
-      label: 'Cloud & Mobile',
+      label: 'Cloud & Mobile Hub',
       icon: Layers,
+      group: 'platform',
     },
   ];
 
-  const activeOrg = workspaceSession?.activeOrganization;
-  const accessibleOrgs = workspaceSession?.accessibleOrganizations || [];
-  const activeOrgMembership = accessibleOrgs.find((a) => a.organization.id === activeOrg?.id);
+  const activeNavTabItem = navTabs.find((t) => t.id === activeTab);
 
   if (demoPayToken) {
     return (
@@ -488,286 +702,267 @@ export default function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark">
-      <div className="min-h-screen bg-[#fafafa] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans relative overflow-x-hidden transition-colors duration-300">
-        {/* Top-Center Ambient Radial Glow (Light & Dark Mode) */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_75%_55%_at_50%_-15%,rgba(99,102,241,0.10),transparent)] dark:bg-[radial-gradient(ellipse_75%_55%_at_50%_-15%,rgba(99,102,241,0.18),transparent)] z-0"
-        />
-
-        {/* Fixed Floating Pill Navigation (Taskbar) */}
-        <FloatingNavbar
+      <div className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 flex font-sans relative overflow-x-hidden transition-colors duration-200">
+        {/* Left Categorized Enterprise SaaS Sidebar */}
+        <EnterpriseSidebar
           tabs={navTabs}
           activeTab={activeTab}
-          onSelectTab={(tabId: string) => setActiveTab(tabId)}
+          onSelectTab={(tabId) => setActiveTab(tabId)}
           onLogout={handleLogout}
           userName={workspaceSession?.user?.fullName}
+          userRole={workspaceSession?.activeRole}
+          activeOrgName={workspaceSession?.activeOrganization?.displayName}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
-        {/* Contextual Multi-Organization, Branch & Case Selector Strip */}
-        <div className="relative z-20 pt-20 pb-2 px-4 max-w-7xl w-full mx-auto">
-          <div className="rounded-full px-4 py-2 bg-white/75 dark:bg-zinc-900/50 backdrop-blur-xl border border-zinc-200/70 dark:border-white/8 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-            {/* Organization & Branch Quick Switchers */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                  Org:
-                </span>
-                <select
-                  aria-label="Switch Active Organization Workspace"
-                  data-testid="header-org-switcher"
-                  value={activeOrg?.id || ''}
-                  onChange={(e) => handleQuickSwitchWorkspace(e.target.value)}
-                  className="bg-transparent text-zinc-900 dark:text-zinc-100 font-semibold text-xs focus:outline-none cursor-pointer"
+        {/* Right Workspace Content Column */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Sticky Contextual Top Header */}
+          <WorkspaceTopBar
+            activeTabLabel={activeNavTabItem?.label || 'Command Center'}
+            workspaceSession={workspaceSession}
+            cases={cases}
+            activeCase={activeCase}
+            asOfDate={asOfDate}
+            onSelectCase={(caseId) => setActiveCaseId(caseId)}
+            onDateChange={(date) => {
+              setAsOfDate(date);
+              handleRunAnalysis();
+            }}
+            onQuickSwitchWorkspace={handleQuickSwitchWorkspace}
+            onOpenNewCaseModal={() => setIsNewCaseModalOpen(true)}
+            onOpenGenerateInvoice={() => {
+              setOpenInvoiceGeneratorOnMount(true);
+              setActiveTab('invoices-billing');
+            }}
+            onResetDemo={handleResetDemo}
+            onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+          />
+
+          {/* Main View Area */}
+          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 lg:px-6 py-6">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
+                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs font-semibold">Loading DuesGuard AI Unified Platform...</p>
+              </div>
+            ) : !caseRecordExists(caseData) ? (
+              <div className="text-center py-20">
+                <p className="text-zinc-500 text-sm">No active case selected.</p>
+                <button
+                  onClick={handleResetDemo}
+                  className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
                 >
-                  {accessibleOrgs.map(({ organization, role }) => (
-                    <option
-                      key={organization.id}
-                      value={organization.id}
-                      className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                    >
-                      {organization.displayName} ({ROLE_LABELS[role]})
-                    </option>
-                  ))}
-                </select>
+                  Load InnoSprint Demo Case
+                </button>
               </div>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && (
+                  <DashboardView
+                    caseRecord={caseData.case}
+                    documents={documents}
+                    invoices={invoices}
+                    payments={caseData.payments || []}
+                    analysis={analysis}
+                    onRunAnalysis={handleRunAnalysis}
+                    isAnalyzing={isAnalyzing}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                    onOpenReportModal={() => setActiveTab('reports')}
+                    workspaceSession={workspaceSession}
+                    onLogPayment={handleLogPayment}
+                    onDeletePayment={handleDeletePayment}
+                    onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
+                  />
+                )}
 
-              <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                {activeTab === 'invoices-billing' && (
+                  <InvoicesBillingView
+                    caseRecord={caseData.case}
+                    invoices={invoices}
+                    payments={caseData.payments || []}
+                    customers={customers}
+                    products={products}
+                    asOfDate={asOfDate}
+                    sellerState="Maharashtra"
+                    initialOpenCreateModal={openInvoiceGeneratorOnMount}
+                    preselectedCustomerId={preselectedCustomerForInvoice}
+                    onClearInitialModalState={() => {
+                      setOpenInvoiceGeneratorOnMount(false);
+                      setPreselectedCustomerForInvoice(null);
+                    }}
+                    onGenerateInvoice={handleGenerateGstInvoice}
+                    onLogPayment={handleLogPayment}
+                    onDeletePayment={handleDeletePayment}
+                    onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
+                    onSendReminderForInvoice={(invId) => {
+                      setPreselectedInvoiceForReminder(invId);
+                      setActiveTab('reminders');
+                    }}
+                  />
+                )}
 
-              {activeOrg && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                    Branch:
-                  </span>
-                  <select
-                    aria-label="Switch Active Operating Branch"
-                    data-testid="header-branch-switcher"
-                    value={workspaceSession?.activeBranchId || ''}
-                    onChange={(e) => handleQuickSwitchWorkspace(activeOrg.id, e.target.value)}
-                    className="bg-transparent text-zinc-900 dark:text-zinc-100 font-semibold text-xs focus:outline-none cursor-pointer"
-                  >
-                    {activeOrgMembership?.allBranchesAccess && (
-                      <option
-                        value="ALL_BRANCHES"
-                        className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                      >
-                        All Branches ({activeOrg.branches.length})
-                      </option>
-                    )}
-                    {activeOrg.branches
-                      .filter(
-                        (b) =>
-                          activeOrgMembership?.allBranchesAccess ||
-                          activeOrgMembership?.allowedBranchIds.includes(b.id)
-                      )
-                      .map((b) => (
-                        <option
-                          key={b.id}
-                          value={b.id}
-                          className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                        >
-                          {b.branchName} ({b.city})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
+                {activeTab === 'customers-products' && (
+                  <CustomersProductsView
+                    customers={customers}
+                    products={products}
+                    sellerState="Maharashtra"
+                    onAddCustomer={handleAddCustomer}
+                    onAddProduct={handleAddProduct}
+                    onDeleteProduct={handleDeleteProduct}
+                    onOpenInvoiceForCustomer={(customerId) => {
+                      setPreselectedCustomerForInvoice(customerId);
+                      setOpenInvoiceGeneratorOnMount(true);
+                      setActiveTab('invoices-billing');
+                    }}
+                    onSendReminderForCustomer={(customerId) => {
+                      setPreselectedCustomerForReminder(customerId);
+                      setActiveTab('reminders');
+                    }}
+                  />
+                )}
+
+                {activeTab === 'reminders' && (
+                  <OverdueRemindersView
+                    caseRecord={caseData.case}
+                    invoices={invoices}
+                    customers={customers}
+                    reminderLogs={reminderLogs}
+                    asOfDate={asOfDate}
+                    preselectedInvoiceId={preselectedInvoiceForReminder}
+                    preselectedCustomerId={preselectedCustomerForReminder}
+                    onClearPreselection={() => {
+                      setPreselectedInvoiceForReminder(null);
+                      setPreselectedCustomerForReminder(null);
+                    }}
+                    onTriggerSchedulerCycle={handleTriggerReminderCycle}
+                    onSendManualNotice={handleSendManualReminder}
+                    onBroadcastAllOverdue={handleBroadcastAllOverdue}
+                    onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
+                  />
+                )}
+
+                {activeTab === 'auth-workspaces' && (
+                  <WorkspaceAuthPortalView
+                    workspaceSession={workspaceSession}
+                    onSessionUpdated={(session) => setWorkspaceSession(session)}
+                    onNavigateToDashboard={() => setActiveTab('dashboard')}
+                    initialRoute={authInitialRoute}
+                    isLoggedOut={isLoggedOut}
+                    onLogout={handleLogout}
+                  />
+                )}
+
+                {activeTab === 'documents' && (
+                  <DocumentsView
+                    documents={documents}
+                    onUploadDocument={handleUploadDocument}
+                    onPreviewDocument={(doc) => setPreviewDocument(doc)}
+                  />
+                )}
+
+                {activeTab === 'evidence' && (
+                  <EvidenceGraphView
+                    evidenceLinks={evidenceLinks}
+                    invoices={invoices}
+                    purchaseOrders={purchaseOrders}
+                    deliveries={deliveries}
+                    onOpenFinding={() => setActiveTab('review')}
+                  />
+                )}
+
+                {activeTab === 'finance' && (
+                  <FinanceEngineView
+                    invoices={invoices}
+                    msmedResult={analysis?.msmedResult}
+                    contractualDays={caseData.case.contractualPaymentDays || 30}
+                    asOfDate={asOfDate}
+                    onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
+                  />
+                )}
+
+                {activeTab === 'compliance' && (
+                  <ComplianceView
+                    caseRecord={caseData.case}
+                    udyamCheck={analysis?.udyamCheck}
+                    gstinChecks={analysis?.gstinChecks}
+                    invoiceDates={invoices.map((i) => i.invoiceDate)}
+                  />
+                )}
+
+                {activeTab === 'trace' && (
+                  <AgentTraceView
+                    analysis={analysis}
+                    onRunAnalysis={handleRunAnalysis}
+                    isAnalyzing={isAnalyzing}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+
+                {activeTab === 'review' && (
+                  <ReviewApprovalView
+                    caseRecord={caseData.case}
+                    analysis={analysis}
+                    onApprove={handleApprove}
+                    onUpdateFinding={handleUpdateFinding}
+                    onOpenReportModal={() => setActiveTab('reports')}
+                  />
+                )}
+
+                {activeTab === 'reports' && (
+                  <ReportsView
+                    caseRecord={caseData.case}
+                    analysis={analysis}
+                    invoices={invoices}
+                    documents={documents}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                  />
+                )}
+
+                {activeTab === 'chatbot' && (
+                  <ChatbotView
+                    caseRecord={caseData.case}
+                    invoices={invoices}
+                    analysis={analysis}
+                    chatHistory={chatHistory}
+                    onSendMessage={handleSendChatMessage}
+                    onClearChat={handleClearChat}
+                    isSending={isSendingChat}
+                  />
+                )}
+
+                {activeTab === 'architecture' && (
+                  <ArchitectureHubView
+                    caseRecord={caseData.case}
+                    invoices={invoices}
+                    findings={findings}
+                    analysis={analysis}
+                    tenants={tenants}
+                    activeTenantId={activeTenantId}
+                    onSelectTenant={(tId) => setActiveTenantId(tId)}
+                    onRefreshCase={() => fetchCaseDetails(activeCaseId)}
+                  />
+                )}
+              </>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="relative z-10 border-t border-zinc-200 dark:border-zinc-800/80 py-4 px-6 text-xs text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-950/60">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <strong className="text-zinc-800 dark:text-zinc-200">DuesGuard AI</strong> — Unified
+                MSME GST Billing, Automated Overdue Reminder Engine &amp; MSMED Act 2006 Statutory
+                Resolution Platform.
+              </span>
+              <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                Policy: MSMED_ACT_2006_SEC_15_16_V2.1 · Intra/Inter-State GST · 5-Stage Reminder
+                Scheduler
+              </span>
             </div>
-
-            {/* Active Case & Statutory Cutoff Date */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                  Case:
-                </span>
-                <select
-                  aria-label="Select active delayed-payment case"
-                  value={activeCase?.id || ''}
-                  onChange={(e) => setActiveCaseId(e.target.value)}
-                  className="bg-transparent text-zinc-900 dark:text-zinc-100 font-semibold text-xs focus:outline-none cursor-pointer"
-                >
-                  {cases.map((c) => (
-                    <option
-                      key={c.id}
-                      value={c.id}
-                      className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                    >
-                      {c.caseReference}: {c.buyerName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <span className="text-zinc-300 dark:text-zinc-700">|</span>
-
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                  As-of:
-                </span>
-                <input
-                  type="date"
-                  aria-label="Statutory calculation cutoff date"
-                  value={asOfDate}
-                  onChange={(e) => {
-                    setAsOfDate(e.target.value);
-                    handleRunAnalysis();
-                  }}
-                  className="bg-transparent text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsNewCaseModalOpen(true)}
-                className="px-2.5 py-1 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold text-[11px] transition cursor-pointer"
-              >
-                + New Case
-              </button>
-            </div>
-          </div>
+          </footer>
         </div>
-
-        {/* Main View Area */}
-        <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
-              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-              <p className="text-xs font-semibold">Loading DuesGuard AI Compliance Engine...</p>
-            </div>
-          ) : !caseRecordExists(caseData) ? (
-            <div className="text-center py-20">
-              <p className="text-zinc-500 text-sm">No active case selected.</p>
-              <button
-                onClick={handleResetDemo}
-                className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-full text-xs font-semibold cursor-pointer"
-              >
-                Load InnoSprint Demo Case
-              </button>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'dashboard' && (
-                <DashboardView
-                  caseRecord={caseData.case}
-                  documents={documents}
-                  invoices={invoices}
-                  payments={caseData.payments || []}
-                  analysis={analysis}
-                  onRunAnalysis={handleRunAnalysis}
-                  isAnalyzing={isAnalyzing}
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                  onOpenReportModal={() => setActiveTab('reports')}
-                  workspaceSession={workspaceSession}
-                  onLogPayment={handleLogPayment}
-                  onDeletePayment={handleDeletePayment}
-                  onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
-                />
-              )}
-
-              {activeTab === 'auth-workspaces' && (
-                <WorkspaceAuthPortalView
-                  workspaceSession={workspaceSession}
-                  onSessionUpdated={(session) => setWorkspaceSession(session)}
-                  onNavigateToDashboard={() => setActiveTab('dashboard')}
-                  initialRoute={authInitialRoute}
-                  isLoggedOut={isLoggedOut}
-                  onLogout={handleLogout}
-                />
-              )}
-
-              {activeTab === 'documents' && (
-                <DocumentsView
-                  documents={documents}
-                  onUploadDocument={handleUploadDocument}
-                  onPreviewDocument={(doc) => setPreviewDocument(doc)}
-                />
-              )}
-
-              {activeTab === 'evidence' && (
-                <EvidenceGraphView
-                  evidenceLinks={evidenceLinks}
-                  invoices={invoices}
-                  purchaseOrders={purchaseOrders}
-                  deliveries={deliveries}
-                  onOpenFinding={() => setActiveTab('review')}
-                />
-              )}
-
-              {activeTab === 'finance' && (
-                <FinanceEngineView
-                  invoices={invoices}
-                  msmedResult={analysis?.msmedResult}
-                  contractualDays={caseData.case.contractualPaymentDays || 30}
-                  asOfDate={asOfDate}
-                  onGenerateQrCode={(invId) => setQrModalInvoiceId(invId)}
-                />
-              )}
-
-              {activeTab === 'compliance' && (
-                <ComplianceView
-                  caseRecord={caseData.case}
-                  udyamCheck={analysis?.udyamCheck}
-                  gstinChecks={analysis?.gstinChecks}
-                  invoiceDates={invoices.map((i) => i.invoiceDate)}
-                />
-              )}
-
-              {activeTab === 'trace' && (
-                <AgentTraceView
-                  analysis={analysis}
-                  onRunAnalysis={handleRunAnalysis}
-                  isAnalyzing={isAnalyzing}
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                />
-              )}
-
-              {activeTab === 'review' && (
-                <ReviewApprovalView
-                  caseRecord={caseData.case}
-                  analysis={analysis}
-                  onApprove={handleApprove}
-                  onUpdateFinding={handleUpdateFinding}
-                  onOpenReportModal={() => setActiveTab('reports')}
-                />
-              )}
-
-              {activeTab === 'reports' && (
-                <ReportsView
-                  caseRecord={caseData.case}
-                  analysis={analysis}
-                  invoices={invoices}
-                  documents={documents}
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                />
-              )}
-
-              {activeTab === 'chatbot' && (
-                <ChatbotView
-                  caseRecord={caseData.case}
-                  invoices={invoices}
-                  analysis={analysis}
-                  chatHistory={chatHistory}
-                  onSendMessage={handleSendChatMessage}
-                  onClearChat={handleClearChat}
-                  isSending={isSendingChat}
-                />
-              )}
-
-              {activeTab === 'architecture' && (
-                <ArchitectureHubView
-                  caseRecord={caseData.case}
-                  invoices={invoices}
-                  findings={findings}
-                  analysis={analysis}
-                  tenants={tenants}
-                  activeTenantId={activeTenantId}
-                  onSelectTenant={(tId) => setActiveTenantId(tId)}
-                  onRefreshCase={() => fetchCaseDetails(activeCaseId)}
-                />
-              )}
-            </>
-          )}
-        </main>
 
         {/* Document Provenance Modal */}
         <DocumentPreviewModal
@@ -814,20 +1009,6 @@ export default function App() {
           isSending={isSendingChat}
           onOpenFullChatbot={() => setActiveTab('chatbot')}
         />
-
-        {/* Footer */}
-        <footer className="relative z-10 border-t border-zinc-200/60 dark:border-white/5 py-5 px-6 text-xs text-zinc-500 dark:text-zinc-400">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-            <span>
-              <strong className="text-zinc-800 dark:text-zinc-200">DuesGuard AI</strong> — MSMED Act
-              2006 Statutory Resolution &amp; Evidence Preparation Platform.
-            </span>
-            <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
-              Policy: MSMED_ACT_2006_SEC_15_16_V2.1 · Zero-Float Deterministic Engine · Multi-Org &amp;
-              Branch RBAC
-            </span>
-          </div>
-        </footer>
       </div>
     </ThemeProvider>
   );

@@ -38,6 +38,9 @@ import {
   Trash2,
   Receipt,
   QrCode,
+  Mail,
+  Users,
+  Download,
 } from 'lucide-react';
 import type {
   ActiveWorkspaceSession,
@@ -49,6 +52,7 @@ import type {
   PaymentRecord,
 } from '../types/index.ts';
 import { formatINR } from '../services/finance.ts';
+import { generateGstTaxInvoicePdf } from '../services/pdfGenerator.ts';
 import { useTheme } from './ThemeProvider.tsx';
 import { LogPaymentModal } from './LogPaymentModal.tsx';
 
@@ -234,62 +238,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     },
   ];
 
-  const premiumCardClasses =
-    'rounded-[2rem] bg-white/80 backdrop-blur-xl border border-zinc-100 shadow-[0_8px_40px_rgba(0,0,0,0.03)] dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:border-white/5 dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:-translate-y-1 transition-all duration-300 hover:shadow-[0_16px_50px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_16px_45px_rgba(0,0,0,0.38)]';
+  const humanCardClasses =
+    'rounded-xl bg-white dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/90 shadow-2xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-200';
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* =====================================================================
           1. PAGE HEADER — Greeting, MSMED §§ 15 & 16 Context, Dark/Light Toggle
          ===================================================================== */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 pt-2">
-        <div className="space-y-1.5">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-1">
+        <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-            <span className="uppercase tracking-wider font-bold">
-              MSMED Section 15 &amp; 16 Compliance Overview
+            <span className="uppercase tracking-wide font-semibold text-[11px]">
+              MSMED Section 15 &amp; 16 Statutory Command
             </span>
             <span className="text-zinc-300 dark:text-zinc-700">•</span>
             <span className="font-mono text-zinc-500 dark:text-zinc-400">
-              {activeOrgName} ({activeBranchName})
+              {activeOrgName} &middot; {activeBranchName}
             </span>
           </div>
 
           <h1
             data-testid="dashboard-greeting-heading"
-            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white"
+            className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white"
           >
             Good morning, {userName}
           </h1>
 
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
             Active Dispute Matter:{' '}
-            <strong className="text-zinc-800 dark:text-zinc-200">
+            <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">
               {caseRecord.caseReference}
             </strong>{' '}
-            — {caseRecord.businessName} vs. {caseRecord.buyerName} · Total Enforceable Claim:{' '}
-            <strong className="font-mono text-indigo-600 dark:text-indigo-400">
+            &mdash; {caseRecord.businessName} vs. {caseRecord.buyerName} &middot; Enforceable Claim:{' '}
+            <strong className="font-mono font-semibold text-indigo-600 dark:text-indigo-400">
               {formatINR(totalClaim)}
             </strong>
           </p>
         </div>
 
-        {/* Header Actions + Dedicated Dark/Light Mode Switch */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Header Actions: Crisp Human-Crafted Radii (Zero-Pill Discipline) */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={toggleTheme}
             data-testid="dashboard-theme-toggle-btn"
-            className="px-4 py-2.5 rounded-full text-xs font-bold tracking-wide bg-white/80 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/80 dark:border-white/10 text-zinc-800 dark:text-zinc-200 shadow-sm hover:border-indigo-500/40 flex items-center gap-2 transition cursor-pointer"
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 shadow-2xs flex items-center gap-2 transition cursor-pointer"
           >
             {resolvedTheme === 'dark' ? (
               <>
-                <Sun className="w-4 h-4 text-amber-400" />
-                <span>Light Mode</span>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Light</span>
               </>
             ) : (
               <>
-                <Moon className="w-4 h-4 text-indigo-600" />
-                <span>Dark Mode</span>
+                <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Dark</span>
               </>
             )}
           </button>
@@ -299,156 +303,286 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={onRunAnalysis}
             disabled={isAnalyzing}
             data-testid="run-agent-pipeline-btn"
-            className="px-5 py-2.5 rounded-full font-semibold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 rounded-lg font-semibold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs flex items-center gap-2 transition disabled:opacity-50 cursor-pointer"
           >
             <Play className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            <span>{isAnalyzing ? 'Executing LangGraph...' : 'Run Agentic Pipeline'}</span>
+            <span>{isAnalyzing ? 'Executing...' : 'Run Agent Pipeline'}</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenReportModal}
-            className="px-4 py-2.5 rounded-full font-semibold text-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 flex items-center gap-2 transition cursor-pointer"
+            className="px-3.5 py-2 rounded-lg font-semibold text-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-2xs flex items-center gap-2 transition cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Export PDF Annexure</span>
+            <span>Export Annexure</span>
           </button>
         </div>
       </div>
 
       {/* =====================================================================
-          2. TOP METRICS GRID (4 CARDS) — Framer Motion Staggered Entrances
+          1B. QUICK LAUNCH: BUYER REMINDER BILL & SOFT-COPY GMAIL STUDIO
+         ===================================================================== */}
+      <div
+        data-testid="dashboard-reminder-mail-banner"
+        className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+      >
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+              GMAIL RFC 2822 + ATTACHED SOFT COPIES
+            </span>
+            <span className="text-xs font-bold text-zinc-900 dark:text-white">
+              Send Buyer Reminder Bill &amp; Soft Copy to chandraharshavardhan1@gmail.com
+            </span>
+          </div>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+            Dispatches with RFC 2822 <span className="font-mono">From</span>, <span className="font-mono">To</span>, <span className="font-mono">Date</span>, and <span className="font-mono">Message-ID</span> headers plus both attached soft copies (<span className="font-mono font-semibold">Buyer_Reminder_Bill_INV-101.pdf</span> and <span className="font-mono font-semibold">Buyer_Notice_Portal_Preview_INV-101.html</span>) straight to your Gmail Inbox and Sent Mail.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => onNavigateTab('reminders')}
+            data-testid="dashboard-open-reminder-studio-btn"
+            className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Open Reminder Studio &rarr;</span>
+          </button>
+
+          <a
+            href="https://mail.google.com/mail/u/0/#inbox"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="dashboard-open-gmail-inbox-btn"
+            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition"
+          >
+            <span>Open Gmail Inbox</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+
+      {/* =====================================================================
+          2. ASYMMETRIC BENTO GRID (HUMAN-CRAFTED FINANCIAL COMMAND)
          ===================================================================== */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="show"
         data-testid="top-metrics-grid"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4"
       >
-        {/* Card 1: Total Invoiced (Neutral Zinc Styling) */}
-        <motion.div variants={cardItemVariants} className={`${premiumCardClasses} p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <span className="tracking-wider uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400">
-              Total Invoiced
-            </span>
-            <div className="w-9 h-9 rounded-2xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-600 dark:text-zinc-300">
-              <FileText className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl xl:text-[28px] whitespace-nowrap font-extrabold tracking-tight text-zinc-900 dark:text-white font-mono">
-            {formatINR(totalInvoiced)}
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span>Across {invoices.length} corroborated GST invoices</span>
-            <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-300">
-              PO-2024-881
-            </span>
-          </div>
-        </motion.div>
-
-        {/* Card 2: Collected (Emerald Accent Styling) */}
-        <motion.div variants={cardItemVariants} className={`${premiumCardClasses} p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <span className="tracking-wider uppercase text-xs font-bold text-emerald-500 dark:text-emerald-400">
-              Collected
-            </span>
-            <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl xl:text-[28px] whitespace-nowrap font-extrabold tracking-tight text-emerald-500 dark:text-emerald-400 font-mono">
-            {formatINR(totalPaid)}
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span>Verified partial bank allocations</span>
-            <span className="font-semibold text-emerald-500 dark:text-emerald-400">
-              {settledPercent}% Settled
-            </span>
-          </div>
-        </motion.div>
-
-        {/* Card 3: Overdue Principal (Rose Accent + Subtle Glowing Background Blob) */}
+        {/* Bento Hero Card 1 (Span 6 cols on lg): Total Enforceable Claim & Statutory Math */}
         <motion.div
           variants={cardItemVariants}
-          className={`${premiumCardClasses} p-6 relative overflow-hidden`}
+          className={`lg:col-span-6 ${humanCardClasses} p-5 flex flex-col justify-between`}
         >
-          {/* Subtle Glowing Rose Background Blob */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-10 -right-10 w-36 h-36 rounded-full bg-rose-500/15 dark:bg-rose-500/20 blur-3xl"
-          />
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <span className="tracking-wider uppercase text-xs font-bold text-rose-500 dark:text-rose-400">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Total Enforceable Claim (MSMED §§ 15 &amp; 16)
+              </span>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                3&times; RBI Bank Rate &middot; 20.25% p.a.
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-3">
+              <div className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white font-mono tabular-nums">
+                {formatINR(totalClaim)}
+              </div>
+              <div className="text-xs text-zinc-500 font-mono">
+                Billed: {formatINR(totalInvoiced)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            <div>
+              <div className="text-[10px] uppercase font-semibold text-zinc-400">
+                Overdue Principal
+              </div>
+              <div className="font-mono font-bold text-rose-600 dark:text-rose-400 mt-0.5 tabular-nums">
+                {formatINR(totalOverdue)}
+              </div>
+              <div className="text-[10px] text-zinc-500">2 Invoices Breached</div>
+            </div>
+
+            <div>
+              <div className="text-[10px] uppercase font-semibold text-zinc-400">
+                §16 Statutory Interest
+              </div>
+              <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 tabular-nums">
+                {formatINR(totalInterest)}
+              </div>
+              <div className="text-[10px] text-zinc-500">Monthly Compounding</div>
+            </div>
+
+            <div className="col-span-2 sm:col-span-1 flex flex-col justify-end">
+              <button
+                type="button"
+                onClick={() => onNavigateTab('finance')}
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Audit Calculation</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Bento Card 2 (Span 3 cols on lg): Overdue Principal & Statutory Status */}
+        <motion.div
+          variants={cardItemVariants}
+          className={`lg:col-span-3 ${humanCardClasses} p-5 flex flex-col justify-between`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                 Overdue Principal
               </span>
-              <div className="w-9 h-9 rounded-2xl bg-rose-500/10 dark:bg-rose-400/10 flex items-center justify-center text-rose-500 dark:text-rose-400">
-                <AlertOctagon className="w-4 h-4" />
-              </div>
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                §15 Breached
+              </span>
             </div>
-            <div className="text-2xl xl:text-[28px] whitespace-nowrap font-extrabold tracking-tight text-rose-500 dark:text-rose-400 font-mono">
+            <div className="text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400 font-mono tabular-nums">
               {formatINR(totalOverdue)}
             </div>
-            <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-rose-500 dark:text-rose-400">
-              <Clock className="w-3.5 h-3.5 shrink-0" />
-              <span>MSMED §15 deadline has passed (INV-101 &amp; INV-102)</span>
-            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              Statutory 45-day credit cap exceeded for INV-101 and INV-102.
+            </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+            <span className="text-zinc-500 font-mono">2 Invoices Unpaid</span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('reminders')}
+              className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+            >
+              Issue Notice &rarr;
+            </button>
           </div>
         </motion.div>
 
-        {/* Card 4: § 16 Statutory Interest (Indigo Accent Styling) */}
+        {/* Bento Card 3 (Span 3 cols on lg): Realized Collections & Cashflow */}
         <motion.div
           variants={cardItemVariants}
-          className={`${premiumCardClasses} p-6 relative overflow-hidden`}
+          className={`lg:col-span-3 ${humanCardClasses} p-5 flex flex-col justify-between`}
         >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -bottom-10 -right-10 w-36 h-36 rounded-full bg-indigo-500/10 dark:bg-indigo-500/15 blur-3xl"
-          />
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <span className="tracking-wider uppercase text-xs font-bold text-indigo-500 dark:text-indigo-400">
-                § 16 Statutory Interest
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Settled &amp; Recovered
               </span>
-              <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/10 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl xl:text-[28px] whitespace-nowrap font-extrabold tracking-tight text-indigo-500 dark:text-indigo-400 font-mono">
-              {formatINR(totalInterest)}
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="font-semibold text-indigo-500 dark:text-indigo-400">
-                3× RBI Bank Rate (20.25% p.a.)
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                {settledPercent}% Realized
               </span>
-              <span className="text-zinc-500 dark:text-zinc-400 font-mono">Monthly Rests</span>
             </div>
+            <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+              {formatINR(totalPaid)}
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              Bank reconciliation verified for INV-103 via statutory payment ledger.
+            </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+            <span className="text-zinc-500 font-mono">1 Invoice Settled</span>
+            <button
+              type="button"
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+            >
+              + Log Payment
+            </button>
           </div>
         </motion.div>
       </motion.div>
+
+      {/* =====================================================================
+          2B. UNIFIED ERP, GST BILLING & REMINDER AUTOMATION STRIP
+         ===================================================================== */}
+      <div
+        data-testid="dashboard-erp-quick-strip"
+        className="grid grid-cols-1 md:grid-cols-3 gap-3"
+      >
+        <button
+          type="button"
+          onClick={() => onNavigateTab('invoices-billing')}
+          className="text-left p-4 rounded-xl bg-white dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs transition flex items-center justify-between gap-3 cursor-pointer"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-900 dark:text-white">
+              <Receipt className="w-4 h-4 text-indigo-500 shrink-0" />
+              <span>GST Tax Invoices &amp; Billing</span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-6">
+              Intra-State CGST+SGST &amp; Inter-State IGST Engine
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-zinc-400 shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('customers-products')}
+          className="text-left p-4 rounded-xl bg-white dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs transition flex items-center justify-between gap-3 cursor-pointer"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-900 dark:text-white">
+              <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Customers &amp; Product Catalogue</span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-6">
+              Place-of-Supply State Rules &amp; SKU Cost Margins
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-zinc-400 shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('reminders')}
+          className="text-left p-4 rounded-xl bg-white dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs transition flex items-center justify-between gap-3 cursor-pointer"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-900 dark:text-white">
+              <Mail className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Overdue Email Reminder Scheduler</span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-6">
+              5-Stage Idempotent Notices &amp; Durable Audit Logs
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-zinc-400 shrink-0" />
+        </button>
+      </div>
 
       {/* =====================================================================
           3. MAIN ANALYSIS SPLIT (50/50 LAYOUT)
              Left: Recharts Overdue Aging Analysis
              Right: LangGraph Agent Trace (Active Agent Findings)
          ===================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* LEFT SIDE (50%): Overdue Aging Analysis (Recharts BarChart) */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.25 }}
+          transition={{ duration: 0.3 }}
           data-testid="overdue-aging-chart-card"
-          className={`lg:col-span-6 ${premiumCardClasses} p-7 flex flex-col justify-between`}
+          className={`lg:col-span-6 ${humanCardClasses} p-6 flex flex-col justify-between`}
         >
           <div>
-            <div className="flex items-start justify-between gap-4 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
               <div>
-                <div className="tracking-wider uppercase text-xs font-bold text-indigo-500 dark:text-indigo-400">
+                <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   MSMED Act Section 15 Aging Distribution
                 </div>
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white mt-1">
+                <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white mt-0.5">
                   Overdue Aging Analysis
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -465,13 +599,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
             </div>
 
-            {/* Recharts BarChart with rounded top corners radius={[8, 8, 0, 0]} and removed axis lines */}
+            {/* Recharts BarChart with clean styling */}
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={agingBuckets}
                   margin={{ top: 12, right: 12, left: 4, bottom: 8 }}
-                  barSize={56}
+                  barSize={52}
                 >
                   <XAxis
                     dataKey="bucket"
@@ -499,11 +633,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         resolvedTheme === 'dark'
                           ? 'rgba(255,255,255,0.03)'
                           : 'rgba(0,0,0,0.03)',
-                      radius: 12,
+                      radius: 8,
                     }}
                     content={<CustomAgingTooltip />}
                   />
-                  <Bar dataKey="amountInr" radius={[8, 8, 0, 0]}>
+                  <Bar dataKey="amountInr" radius={[6, 6, 0, 0]}>
                     {agingBuckets.map((entry, idx) => (
                       <Cell
                         key={`cell-${idx}`}
@@ -517,35 +651,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Aging Bucket Legend Summary */}
-          <div className="grid grid-cols-3 gap-3 pt-4 border-t border-zinc-100 dark:border-white/5 text-xs">
-            <div className="p-3 rounded-2xl bg-zinc-50/80 dark:bg-white/[0.03]">
-              <div className="tracking-wider uppercase text-[10px] font-bold text-emerald-500 dark:text-emerald-400">
+          <div className="grid grid-cols-3 gap-2.5 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+            <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="text-[10px] uppercase font-semibold text-emerald-600 dark:text-emerald-400">
                 0–15 Days
               </div>
-              <div className="font-mono font-bold text-zinc-900 dark:text-white mt-0.5">
+              <div className="font-mono font-bold text-zinc-900 dark:text-white mt-0.5 tabular-nums">
                 {formatINR(inv103Out)}
               </div>
-              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">INV-103 (Current)</div>
+              <div className="text-[11px] text-zinc-500">INV-103 (Current)</div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-zinc-50/80 dark:bg-white/[0.03]">
-              <div className="tracking-wider uppercase text-[10px] font-bold text-indigo-500 dark:text-indigo-400">
+            <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="text-[10px] uppercase font-semibold text-indigo-600 dark:text-indigo-400">
                 16–45 Days
               </div>
-              <div className="font-mono font-bold text-zinc-900 dark:text-white mt-0.5">
+              <div className="font-mono font-bold text-zinc-900 dark:text-white mt-0.5 tabular-nums">
                 {formatINR(inv102Out)}
               </div>
-              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">INV-102 (Overdue)</div>
+              <div className="text-[11px] text-zinc-500">INV-102 (Overdue)</div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15">
-              <div className="tracking-wider uppercase text-[10px] font-bold text-rose-500 dark:text-rose-400">
+            <div className="p-3 rounded-lg bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20">
+              <div className="text-[10px] uppercase font-semibold text-rose-600 dark:text-rose-400">
                 &gt; 45 Days Critical
               </div>
-              <div className="font-mono font-bold text-rose-500 dark:text-rose-400 mt-0.5">
+              <div className="font-mono font-bold text-rose-600 dark:text-rose-400 mt-0.5 tabular-nums">
                 {formatINR(inv101Out)}
               </div>
-              <div className="text-[11px] text-rose-500/80 dark:text-rose-300/80">
+              <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
                 INV-101 (§15 Cap Breach)
               </div>
             </div>
@@ -554,24 +688,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* RIGHT SIDE (50%): LangGraph Agent Trace — Active Agent Findings Feed */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.32 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
           data-testid="langgraph-agent-trace-card"
-          className={`lg:col-span-6 ${premiumCardClasses} p-7 flex flex-col justify-between`}
+          className={`lg:col-span-6 ${humanCardClasses} p-6 flex flex-col justify-between`}
         >
           <div>
-            <div className="flex items-start justify-between gap-4 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
               <div>
-                <div className="tracking-wider uppercase text-xs font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-1.5">
+                <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5" />
                   <span>LangGraph Agent Trace</span>
                 </div>
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white mt-1">
+                <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white mt-0.5">
                   Active Agent Findings
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Real-time multi-agent compliance checks with source document provenance
+                  Deterministic multi-agent compliance checks with source document provenance
                 </p>
               </div>
 
@@ -586,28 +720,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Findings Feed Cards */}
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {agentFindings.map((finding) => {
                 const isWarning = finding.type === 'warning';
                 return (
                   <div
                     key={finding.id}
                     data-testid={`agent-finding-card-${finding.code}`}
-                    className={`rounded-3xl p-4 border transition-all ${
+                    className={`rounded-lg p-3.5 border transition-all ${
                       isWarning
-                        ? 'bg-rose-500/[0.04] dark:bg-rose-500/[0.07] border-rose-500/20 dark:border-rose-400/20'
-                        : 'bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] border-emerald-500/20 dark:border-emerald-400/20'
+                        ? 'bg-rose-500/5 dark:bg-rose-500/10 border-rose-500/20'
+                        : 'bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20'
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                       <div className="flex items-center gap-2">
                         {isWarning ? (
-                          <ShieldAlert className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
+                          <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
                         ) : (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                         )}
                         <span
-                          className={`font-mono text-xs font-extrabold tracking-tight ${
+                          className={`font-mono text-xs font-bold tracking-tight ${
                             isWarning
                               ? 'text-rose-600 dark:text-rose-400'
                               : 'text-emerald-600 dark:text-emerald-400'
@@ -617,8 +751,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
 
-                      {/* Specific LangGraph Agent Badge */}
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-zinc-900/5 dark:bg-white/10 text-zinc-700 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/10">
+                      {/* Specific LangGraph Agent Badge (Zero-Pill: rounded-md) */}
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                         {finding.agentBadge}
                       </span>
                     </div>
@@ -633,16 +767,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Human Review Gate Footer Bar */}
-          <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-              <span>Human-in-the-Loop checkpoint active prior to final ODR PDF seal</span>
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Human-in-the-Loop checkpoint active prior to final ODR seal</span>
             </div>
 
             <button
               type="button"
               onClick={() => onNavigateTab('review')}
-              className="px-4 py-2 rounded-full text-xs font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 transition flex items-center gap-1.5 cursor-pointer"
             >
               <span>Open Review Gate</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -654,17 +788,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* =====================================================================
           4. DISPUTED INVOICE LEDGER (Corroborated Synthetic Truth Table)
          ===================================================================== */}
-      <div className={`${premiumCardClasses} p-7`} data-testid="disputed-invoice-ledger-card">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+      <div className={`${humanCardClasses} p-6`} data-testid="disputed-invoice-ledger-card">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
-            <div className="tracking-wider uppercase text-xs font-bold text-zinc-400 dark:text-zinc-500">
+            <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               Deterministic Zero-Float Ledger (`decimal.js` · Integer Paise)
             </div>
-            <h3 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white mt-0.5">
+            <h3 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white mt-0.5">
               Corroborated Invoice &amp; Delivery Schedule
             </h3>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {onLogPayment && (
               <button
                 type="button"
@@ -673,7 +807,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   setPreselectedInvoiceId('inv-101');
                   setIsPaymentModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition cursor-pointer"
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
                 <span>Log Payment (UPI / Bank UTR)</span>
@@ -684,7 +818,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => onNavigateTab('evidence')}
               className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <span>Open Evidence Relationship Graph</span>
+              <span>Evidence Graph</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -693,77 +827,92 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-zinc-200/70 dark:border-white/10 text-zinc-400 dark:text-zinc-500 uppercase tracking-wider text-[11px] font-bold">
-                <th className="py-3 px-4">Invoice #</th>
-                <th className="py-3 px-4">Invoice Date</th>
-                <th className="py-3 px-4">PO Reference</th>
-                <th className="py-3 px-4">Delivery Challan</th>
-                <th className="py-3 px-4 text-right">Invoiced</th>
-                <th className="py-3 px-4 text-right">Paid</th>
-                <th className="py-3 px-4 text-right">Outstanding</th>
-                <th className="py-3 px-4 text-center">MSMED Status</th>
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+                <th className="py-2.5 px-3">Invoice #</th>
+                <th className="py-2.5 px-3">Invoice Date</th>
+                <th className="py-2.5 px-3">PO Reference</th>
+                <th className="py-2.5 px-3">Delivery Challan</th>
+                <th className="py-2.5 px-3 text-right">Invoiced</th>
+                <th className="py-2.5 px-3 text-right">Paid</th>
+                <th className="py-2.5 px-3 text-right">Outstanding</th>
+                <th className="py-2.5 px-3 text-center">MSMED Status</th>
                 {(onLogPayment || onGenerateQrCode) && (
-                  <th className="py-3 px-4 text-right">Actions &amp; QR</th>
+                  <th className="py-2.5 px-3 text-right">Actions &amp; QR</th>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-white/5 text-zinc-700 dark:text-zinc-300">
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
               {invoices.map((inv) => {
                 const isPaid = inv.status === 'paid' || Number(inv.outstandingAmountPaise) === 0;
                 const isOverdue = !isPaid && (inv.status === 'overdue' || inv.status === 'disputed');
                 return (
                   <tr
                     key={inv.id}
-                    className="hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition"
+                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition"
                   >
-                    <td className="py-3.5 px-4 font-mono font-bold text-zinc-900 dark:text-white">
+                    <td className="py-3 px-3 font-mono font-bold text-zinc-900 dark:text-white">
                       {inv.invoiceNumber}
                     </td>
-                    <td className="py-3.5 px-4 font-mono">{inv.invoiceDate}</td>
-                    <td className="py-3.5 px-4 font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
+                    <td className="py-3 px-3 font-mono">{inv.invoiceDate}</td>
+                    <td className="py-3 px-3 font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
                       {inv.poReference || '—'}
                     </td>
-                    <td className="py-3.5 px-4 font-mono">
+                    <td className="py-3 px-3 font-mono">
                       {inv.deliveryReference || 'Missing POD'}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-medium">
+                    <td className="py-3 px-3 text-right font-mono font-medium tabular-nums">
                       {formatINR(inv.totalAmountPaise)}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                    <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                       {formatINR(inv.paidAmountPaise || '0')}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-bold text-zinc-900 dark:text-white">
+                    <td className="py-3 px-3 text-right font-mono font-bold text-zinc-900 dark:text-white tabular-nums">
                       {formatINR(inv.outstandingAmountPaise)}
                     </td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-3 text-center">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                           isPaid
-                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                             : isOverdue
-                            ? 'bg-rose-500/10 text-rose-500 dark:text-rose-400'
-                            : 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                         }`}
                       >
                         {isPaid
-                          ? 'SETTLED (PAID)'
+                          ? 'SETTLED'
                           : isOverdue
                           ? 'OVERDUE (§ 16)'
                           : 'NOT YET DUE'}
                       </span>
                     </td>
                     {(onLogPayment || onGenerateQrCode) && (
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const doc = generateGstTaxInvoicePdf({
+                                invoice: inv,
+                                caseRecord,
+                                customerState: inv.buyerState || 'Maharashtra',
+                              });
+                              doc.save(`Tax_Invoice_${inv.invoiceNumber}.pdf`);
+                            }}
+                            className="px-2 py-1 rounded-md text-[11px] font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 flex items-center gap-1 transition cursor-pointer whitespace-nowrap"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>Tax PDF</span>
+                          </button>
                           {onGenerateQrCode && (
                             <button
                               type="button"
                               data-testid={`generate-qr-btn-${inv.id}`}
                               onClick={() => onGenerateQrCode(inv.id)}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 flex items-center gap-1 transition cursor-pointer whitespace-nowrap"
+                              className="px-2 py-1 rounded-md text-[11px] font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1 transition cursor-pointer whitespace-nowrap"
                             >
                               <QrCode className="w-3 h-3" />
-                              <span>Generate QR Code</span>
+                              <span>QR</span>
                             </button>
                           )}
                           {onLogPayment && (
@@ -773,7 +922,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 setPreselectedInvoiceId(inv.id);
                                 setIsPaymentModalOpen(true);
                               }}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-zinc-100 hover:bg-emerald-500/15 text-zinc-700 hover:text-emerald-600 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-emerald-400 transition cursor-pointer whitespace-nowrap"
+                              className="px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition cursor-pointer whitespace-nowrap"
                             >
                               + Allocate
                             </button>
@@ -792,40 +941,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {payments.length > 0 && (
           <div
             data-testid="recorded-payments-ledger"
-            className="mt-6 pt-5 border-t border-zinc-200/70 dark:border-white/10 space-y-3"
+            className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2.5"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                 <Receipt className="w-3.5 h-3.5" />
                 <span>Recorded External Payment Allocations ({payments.length})</span>
               </div>
-              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">
+              <span className="text-[11px] text-zinc-400 font-mono">
                 Section 16 Monthly Rests Recalculated Dynamically
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {payments.map((pay) => (
                 <div
                   key={pay.id}
-                  className="p-3.5 rounded-2xl bg-emerald-500/[0.04] dark:bg-emerald-500/[0.07] border border-emerald-500/20 flex items-center justify-between gap-3 text-xs"
+                  className="p-3 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                         {pay.paymentMethod || 'UPI'}
                       </span>
-                      <span className="font-mono font-bold text-zinc-900 dark:text-white">
+                      <span className="font-mono font-bold text-zinc-900 dark:text-white tabular-nums">
                         {formatINR(pay.amountPaise)}
                       </span>
-                      <span className="text-zinc-400">•</span>
-                      <span className="font-mono text-zinc-600 dark:text-zinc-300">
+                      <span className="text-zinc-400">&middot;</span>
+                      <span className="font-mono text-zinc-600 dark:text-zinc-400">
                         {pay.paymentDate}
                       </span>
                     </div>
-                    <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                    <div className="text-[11px] font-mono text-zinc-500">
                       Ref: <strong className="text-zinc-700 dark:text-zinc-200">{pay.reference}</strong>
-                      {pay.invoiceId ? ` → ${pay.invoiceId.toUpperCase()}` : ' → FIFO Auto'}
+                      {pay.invoiceId ? ` &rarr; ${pay.invoiceId.toUpperCase()}` : ' &rarr; FIFO Auto'}
                     </div>
                   </div>
                   {onDeletePayment && (

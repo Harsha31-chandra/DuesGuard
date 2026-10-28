@@ -46,6 +46,8 @@ export interface LineItem {
   sourcePage: number;
 }
 
+export type GstSupplyType = 'INTRA_STATE' | 'INTER_STATE';
+
 export interface InvoiceRecord {
   id: string;
   caseId: string;
@@ -55,6 +57,16 @@ export interface InvoiceRecord {
   seller: string;
   buyerGstin?: string;
   sellerGstin?: string;
+  buyerState?: string;
+  sellerState?: string;
+  buyerEmail?: string;
+  customerId?: string;
+  supplyType?: GstSupplyType;
+  subtotalPaise?: string;
+  cgstPaise?: string;
+  sgstPaise?: string;
+  igstPaise?: string;
+  totalTaxPaise?: string;
   invoiceDate: string; // YYYY-MM-DD
   contractualDueDate?: string;
   agreedPaymentDays?: number; // e.g. 30, 45, 60
@@ -513,6 +525,114 @@ export interface DemoPaymentReceiptData {
   payerNote?: string;
   disclaimer: string;
 }
+
+// --- MERGED DUESGAURD ERP, GST BILLING & OVERDUE REMINDER TYPES ---
+
+export interface CustomerRecord {
+  id: string;
+  organizationId: string;
+  name: string;
+  email: string;
+  phone: string;
+  state: string;
+  gstin?: string;
+  billingAddress: string;
+  creditDays: number;
+  createdAt: string;
+}
+
+export interface ProductItemRecord {
+  id: string;
+  organizationId: string;
+  sku: string;
+  name: string;
+  hsnSacCode: string;
+  unit: 'PCS' | 'SETS' | 'KGS' | 'HRS' | 'LOTS' | string;
+  costPricePaise: string; // Internal cost price (private to MSME)
+  sellingPricePaise: string; // Client billing price
+  gstRatePercent: number; // 0, 5, 12, 18, 28
+  status: 'active' | 'archived';
+  createdAt: string;
+}
+
+export interface GstLineItemCalculation {
+  id: string;
+  productId?: string;
+  sku?: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPricePaise: string;
+  costPricePaise: string;
+  taxRatePercent: number;
+  subtotalPaise: string;
+  cgstPaise: string;
+  sgstPaise: string;
+  igstPaise: string;
+  taxAmountPaise: string;
+  lineTotalPaise: string;
+}
+
+export interface GstInvoiceCalculation {
+  supplyType: GstSupplyType;
+  sellerState: string;
+  buyerState: string;
+  subtotalPaise: string;
+  cgstPaise: string;
+  sgstPaise: string;
+  igstPaise: string;
+  totalTaxPaise: string;
+  grandTotalPaise: string;
+  internalCostTotalPaise: string;
+  estimatedGrossMarginPaise: string;
+  lineItems: GstLineItemCalculation[];
+}
+
+export type EmailReminderRuleType =
+  | 'upcoming_3d'
+  | 'due_today'
+  | 'overdue_1d'
+  | 'overdue_7d'
+  | 'overdue_15d_escalation'
+  | 'manual_notice';
+
+export type ReminderDeliveryChannel = 'email' | 'whatsapp' | 'sms' | 'multi_channel';
+
+export interface EmailReminderLogRecord {
+  id: string;
+  caseId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId?: string;
+  customerName: string;
+  recipientEmail: string;
+  recipientPhone?: string;
+  channel?: ReminderDeliveryChannel;
+  reminderType: EmailReminderRuleType;
+  subject: string;
+  bodyHtml: string;
+  messageText?: string;
+  paymentPortalUrl?: string;
+  statutoryInterestPaise?: string;
+  totalClaimablePaise?: string;
+  status: 'sent' | 'mock_delivered' | 'failed';
+  providerMessageId: string;
+  daysOverdue: number;
+  balanceDuePaise: string;
+  sentAt: string;
+}
+
+export interface FiveBucketAgingDatum {
+  bucketKey: 'current' | 'days_1_7' | 'days_8_15' | 'days_16_45' | 'days_gt_45';
+  bucketLabel: string;
+  shortLabel: string;
+  amountPaise: string;
+  amountInr: number;
+  invoiceCount: number;
+  invoiceRefs: string[];
+  statutoryNote: string;
+}
+
 
 
 
