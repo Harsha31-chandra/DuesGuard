@@ -631,7 +631,7 @@ export default function App() {
     { id: 'trace', label: 'Agent Pipeline', icon: Cpu, group: 'workflow' },
     {
       id: 'review',
-      label: 'Human Review Gate',
+      label: 'Human Review',
       icon: UserCheck,
       badge: analysis?.approvalStatus === 'approved' ? 'Approved' : 'Pending',
       group: 'workflow',
@@ -642,7 +642,7 @@ export default function App() {
       label: 'AI Legal Assistant',
       icon: MessageSquare,
       count: chatHistory.length,
-      group: 'workflow',
+      group: 'platform',
     },
     {
       id: 'auth-workspaces',
@@ -663,7 +663,7 @@ export default function App() {
 
   if (demoPayToken) {
     return (
-      <ThemeProvider attribute="class" defaultTheme="dark">
+      <ThemeProvider attribute="class" defaultTheme="light">
         <DemoPaymentPage
           token={demoPayToken}
           caseIdForReset={activeCaseId}
@@ -679,7 +679,7 @@ export default function App() {
 
   if (isLoggedOut) {
     return (
-      <ThemeProvider attribute="class" defaultTheme="dark">
+      <ThemeProvider attribute="class" defaultTheme="light">
         <AuthGateScreen
           initialMode="login"
           workspaceSession={workspaceSession}
@@ -701,8 +701,8 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark">
-      <div className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 flex font-sans relative overflow-x-hidden transition-colors duration-200">
+    <ThemeProvider attribute="class" defaultTheme="light">
+      <div className="min-h-screen bg-[#f8fafc] dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 flex font-sans relative overflow-x-hidden transition-colors duration-200">
         {/* Left Categorized Enterprise SaaS Sidebar */}
         <EnterpriseSidebar
           tabs={navTabs}
@@ -738,21 +738,22 @@ export default function App() {
             }}
             onResetDemo={handleResetDemo}
             onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+            onOpenAccountSettings={() => setActiveTab('auth-workspaces')}
           />
 
           {/* Main View Area */}
-          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 lg:px-6 py-6">
+          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
-                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-xs font-semibold">Loading DuesGuard AI Unified Platform...</p>
+              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-3" />
+                <p className="text-xs font-medium">Loading DuesGuard AI Workspace...</p>
               </div>
             ) : !caseRecordExists(caseData) ? (
               <div className="text-center py-20">
-                <p className="text-zinc-500 text-sm">No active case selected.</p>
+                <p className="text-slate-500 text-sm">No active case selected.</p>
                 <button
                   onClick={handleResetDemo}
-                  className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  className="mt-3 px-4 py-2 bg-slate-900 text-white rounded-md text-xs font-medium cursor-pointer"
                 >
                   Load InnoSprint Demo Case
                 </button>

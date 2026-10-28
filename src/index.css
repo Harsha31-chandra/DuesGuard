@@ -1,31 +1,81 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  --color-paper: #F4F5F7;
+  --color-surface: #FFFFFF;
+  --color-ink: #15181E;
+  --color-muted: #5B6472;
+  --color-line: #DDE1E7;
+  --color-accent: #0B5C63;
+  --color-danger: #A3341F;
+  --color-warn: #946200;
+  --color-ok: #1F6B3A;
+}
+
+html.dark {
+  --color-paper: #0F1214;
+  --color-surface: #161A1E;
+  --color-ink: #ECEEF1;
+  --color-muted: #98A1AD;
+  --color-line: #272D34;
+  --color-accent: #4FB3BC;
+  --color-danger: #EF8A76;
+  --color-warn: #E3B755;
+  --color-ok: #74C590;
+}
+
+@theme {
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-paper: var(--color-paper);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-line: var(--color-line);
+  --color-accent: var(--color-accent);
+  --color-danger: var(--color-danger);
+  --color-warn: var(--color-warn);
+  --color-ok: var(--color-ok);
+}
+
 @layer base {
   html {
-    font-family: 'Plus Jakarta Sans', 'Noto Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    background-color: #fafafa;
-    color: #18181b;
-    transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  html.dark body {
-    background-color: #121316;
-    color: #f4f4f5;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
   ::selection {
-    background-color: #3b82f6;
+    background-color: var(--color-accent);
     color: #ffffff;
+  }
+
+  /* Keyboard focus ring conforming to WCAG AA */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
 }
 
-/* Human-crafted scrollbars */
+/* Tabular figures for money, quantities, dates */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Subtle, unbloated scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -34,9 +84,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(161, 161, 170, 0.3);
-  border-radius: 4px;
+  background: var(--color-line);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(161, 161, 170, 0.5);
+  background: var(--color-muted);
 }
